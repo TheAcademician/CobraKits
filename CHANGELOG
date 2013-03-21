@@ -1,36 +1,85 @@
-CobraKits Changelog!
-=12/24/2012= Beta .75
--Made compatible with CraftBukkit 1.4.6
+===3/20/2013 Beta .8
+*Compatability update for 1.5.1!
+===3/20/2013 Beta .8
+*Now compatible with 1.5 Development Build
+===2/19/2013 Beta .8
+*Now compatible fully with 1.4.7!
+*Completely revamped command structure to use shorthand commands!
+	**/ckits - Used for config display and changes. To view/change config requires cobrakits.* permission.
+		*** /ckits will display usage info, while /ckits help will provide help for the below commands.
+	**/ckit - Repurposed to the create command. Still requires the same cobrakits.create permission.
+	**/kit - Now the command to use or give a kit. Still uses cobrakits.use/useall/give permission for those actions.
+		*** The Give syntax (/kit [kitname] [username]) is now available to the console to give kits to players.
+		***!Important Note!* the Give syntax is now /kit [kitname] [username] and not the reverse as it had been previously.
+	**/lkit or /kits - Lists the kits available to the use. No separate permission node, linked to /kit permissions.
+	**/ukit - Replaces the update command, allows you to change a kit's contents or rename it. Requires cobrakits.update/updateall permission.
+		* Now able to rename any kit with .updateall permission node, and rename ability is now available via the console!
+	**/dkit - The new delete kit command! Uses the same permission nodes, cobrakits.delete/deleteall.
+*Global Kits
+	**Formerly referred to as "generic" kits that had to be renamed to use, they are now "Global" kits while player kits are "Personal" kits.
+	**You can rename any Personal kit to a Global kit with /ukit, as before.
+	**Or, you can now create it with /ckit by specifing the -g -global flag if you have cobrakits.createall permissions.
+	**Player's can make kits with the same name as Global kits. Their Personal kit will supercede it unless the -g/global flag is used with /kit.
+*Cooldowns! Since .7 the cooldown was global due to bad coding on my part, but now it is per-user as intended.
+	**New permission node added: cobrakits.cooldown.bypass, does exactly what you think.
+*Kit List Pages
+	**Previously, large amounts of kits could clutter up your entire screen D:
+	**Sorted the list, so now global kits will appear at the top, followed by Personal kits.
+	**The kit list now only displays 8 records per page (10 lines total, filling up the chat window). Simply /kit # to go to that page!
+*First logon kits as requested!
+	**Requires a Global kit to be set up, can use any name.
+	**The field "startkit" has been added to the config.yml file.
+	**Configurable in-game with /ckits startkit [kitname] command.
+	**Clear the field in config.yml or enter the command without a kitname to disable the feature.
+*Kit signs! Don't want your playerbase using the kit commands? This is for you!
+	**Two new permissions added: cobrakits.sign.create, cobrakits.sign.use.
+	**Create a sign with the first line either [COBRAKIT] or [KIT] (capitalization does not matter).
+	**On the 3rd line add a valid Global kitname, it *must* be a Global kit..
+		*** Note: The kit sign *requires* a Global kit to operate!
+	**The 4th line is for options, specify c for -c/concat and/or s for -s/silent just like the /kit command.
+	**Save the sign! If you have permissions and the kitname was correct, the following will occur:
+		*** The top like will bold and red.
+		*** The kitname will become blue.
+		*** The 4th line will display c|s labelling active options in gold!
+	**Those w/o permissions, or entering a bad kitname, will result in a blank sign and error message.
+	**Any user with the .sign.use permission can access the kit signs. They are subject to the same cooldown as the /kit command!
+*Other changes and resolved issues.
+	**Added clearing of potion and other affects upon receiving a kit.
+	**Player's with .useall/.deleteall but not .use/.delete could not use/delete their own kits, this is resolved :D
+	**Lots of other stuff I can't all remember D:
 
-=12/15/2012= Beta .7
--Added a config file to the plugin!
-  -Settings include: enable/disable cooldowns and setting their duration, forcing silent or concat on at all times.
-  -All settings can be set ingame with the new /ckitcfg command.
--A few new features have been added!
-  -Cooldowns: If set, player's will be forced to wait between uses of the /ckit command.
-  -Concatenate: If used, the kit will be ADDED to the player's inventory instead of replacing it.
-  -Per Kit Permissions: Added support for cobrakits.[kitname] permissions.
-    -WARNING: giving a user cobrakits.use or .useall permissions will override this!
-  -New argument parsing allows the -s(-silent) and -c(-concat) flags to be set in any order with the kit give commands.
--/ckitcfg
-  -New command to control configuration functions
-  -Requires the cobrakits.* permission
-  -Has commands to toggle all true/false config fields, and provide the cooldown duration
+===12/24/2012 Beta .75
+*Made compatible with CraftBukkit 1.4.6
 
-=11/30/2012= Beta .6
--Lots of code rewriting! Mostly organization and efficiency changes.
--Added ability for admins to rename kits. /ckit update [oldname] [newname]
-	-Does not change kit contents, just the name.
-	-Permissions are included in the cobrakits.* permission.
-	-Allows Admins to create generic kits with no username key. Warning: these take precedence over user kits!
--No longer forces kits to lowercase. Old kits will still work by using full name for those with useall perms.
-	-Admins will need to rename old kits to case sensitive syntax, or give kit to user and allow them to save under new name.
--Integrated cobrakits.list/listall permissions into the use/useall permission for simplicity.
--Added the ability to give kits to other players in-game or through the console.
-	-New command syntax is /ckit [username] [kitname], cobrakits.give is the permission.
-	-To facilitate role-play servers, added optional "-silent" flag to not notify the player.
-	-eg: /ckit You My:Kit -silent
-	-Also now works fine with CommandBlocks! /ckit @p [kitname]
+===12/15/2012 Beta .7
+*Added a config file to the plugin!
+  **Settings include: enable/disable cooldowns and setting their duration, forcing silent or concat on at all times.
+  **All settings can be set ingame with the new /ckitcfg command.
+*A few new features have been added!
+  *Cooldowns: If set, player's will be forced to wait between uses of the /ckit command.
+  *Concatenate: If used, the kit will be ADDED to the player's inventory instead of replacing it.
+  *Per Kit Permissions: Added support for cobrakits.[kitname] permissions.
+    **WARNING: giving a user cobrakits.use or .useall permissions will override this!
+  *New argument parsing allows the -s(-silent) and -c(-concat) flags to be set in any order with the kit give commands.
+*/ckitcfg
+  **New command to control configuration functions
+  **Requires the cobrakits.* permission
+  **Has commands to toggle all true/false config fields, and provide the cooldown duration
 
-=11/27/2012= Beta .5
--Gone from nothing to something!
+===11/30/2012 Beta .6
+*Lots of code rewriting! Mostly organization and efficiency changes.
+*Added ability for admins to rename kits. /ckit update [oldname] [newname]
+	**Does not change kit contents, just the name.
+	**Permissions are included in the cobrakits.* permission.
+	**Allows Admins to create generic kits with no username key. Warning: these take precedence over user kits!
+*No longer forces kits to lowercase. Old kits will still work by using full name for those with useall perms.
+	**Admins will need to rename old kits to case sensitive syntax, or give kit to user and allow them to save under new name.
+*Integrated cobrakits.list/listall permissions into the use/useall permission for simplicity.
+*Added the ability to give kits to other players in-game or through the console.
+	*New command syntax is /ckit [username] [kitname], cobrakits.give is the permission.
+	*To facilitate role-play servers, added optional "-silent" flag to not notify the player.
+	*eg: /ckit You My:Kit -silent
+	*Also now works fine with CommandBlocks! /ckit @p [kitname]
+
+===11/27/2012 Beta .5
+*Gone from nothing to something!
