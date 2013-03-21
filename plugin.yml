@@ -1,0 +1,62 @@
+name: CobraKits
+main: us.drome.CobraKits.CobraKits
+version: .8
+author: TheAcademician
+
+commands:
+  ckits:
+    description: A dynamic kit plugin completely configurble in-game!
+    usage: /ckits help|current|cooldown|duration|silent|concat [value]
+  ckit:
+    description: Create a kit based on your current inventory.
+    usage: /ckit [kitname]
+  lkit:
+  	description: List all of the available kits.
+  	usage: /lkit
+  kits:
+  	description: List all of the available kits.
+  	usage: /kits
+  ukit:
+  	description: Update a kit to your inventory, or optionally rename it.
+  	usage: /ukit [kitname] [newkitname]
+  dkit:
+  	description: Deletes the specificed kit.
+  	usage: /dkit [kitname]
+  kit:
+  	description: Use the kit or Give it to someone else.
+  	usage: /kit [kitname] [targetplayer]
+    
+permissions:
+  cobrakits.*:
+    description: Give access to all CobraKits commands
+    children:
+      cobrakits.create: true
+      cobrakits.update: true
+      cobrakits.updateall: true
+      cobrakits.use: true
+      cobrakits.useall: true
+      cobrakits.delete: true
+      cobrakits.deleteall: true
+      cobrakits.give: true
+      cobrakits.cooldown.bypass: true
+  cobrakits.create:
+    description: Allows player to create a kit
+    default: op
+  cobrakits.update:
+    description: Allows player to update an existing kit
+    default: op
+  cobrakits.use:
+    description: Allows player to use their kits
+    default: op
+  cobrakits.useall:
+    description: Allows player to use any kit
+    default: op
+  cobrakits.delete:
+    description: Allows player to delete their kits
+    default: op
+  cobrakits.deleteall:
+    description: Allows player to delete any kit
+    default: op
+  cobrakits.give:
+    description: Allows player to give kits to other players.
+    default: op

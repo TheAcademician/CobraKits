@@ -1,0 +1,9 @@
+#Cobra Kits Options
+cooldown:
+  enabled: false
+  duration: 600
+silent:
+  always: false
+concat:
+  always: false
+startkit: none

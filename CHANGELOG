@@ -1,0 +1,36 @@
+CobraKits Changelog!
+=12/24/2012= Beta .75
+-Made compatible with CraftBukkit 1.4.6
+
+=12/15/2012= Beta .7
+-Added a config file to the plugin!
+  -Settings include: enable/disable cooldowns and setting their duration, forcing silent or concat on at all times.
+  -All settings can be set ingame with the new /ckitcfg command.
+-A few new features have been added!
+  -Cooldowns: If set, player's will be forced to wait between uses of the /ckit command.
+  -Concatenate: If used, the kit will be ADDED to the player's inventory instead of replacing it.
+  -Per Kit Permissions: Added support for cobrakits.[kitname] permissions.
+    -WARNING: giving a user cobrakits.use or .useall permissions will override this!
+  -New argument parsing allows the -s(-silent) and -c(-concat) flags to be set in any order with the kit give commands.
+-/ckitcfg
+  -New command to control configuration functions
+  -Requires the cobrakits.* permission
+  -Has commands to toggle all true/false config fields, and provide the cooldown duration
+
+=11/30/2012= Beta .6
+-Lots of code rewriting! Mostly organization and efficiency changes.
+-Added ability for admins to rename kits. /ckit update [oldname] [newname]
+	-Does not change kit contents, just the name.
+	-Permissions are included in the cobrakits.* permission.
+	-Allows Admins to create generic kits with no username key. Warning: these take precedence over user kits!
+-No longer forces kits to lowercase. Old kits will still work by using full name for those with useall perms.
+	-Admins will need to rename old kits to case sensitive syntax, or give kit to user and allow them to save under new name.
+-Integrated cobrakits.list/listall permissions into the use/useall permission for simplicity.
+-Added the ability to give kits to other players in-game or through the console.
+	-New command syntax is /ckit [username] [kitname], cobrakits.give is the permission.
+	-To facilitate role-play servers, added optional "-silent" flag to not notify the player.
+	-eg: /ckit You My:Kit -silent
+	-Also now works fine with CommandBlocks! /ckit @p [kitname]
+
+=11/27/2012= Beta .5
+-Gone from nothing to something!
