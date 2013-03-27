@@ -11,20 +11,20 @@ commands:
     description: Create a kit based on your current inventory.
     usage: /ckit [kitname]
   lkit:
-  	description: List all of the available kits.
+    description: List all of the available kits.
   	usage: /lkit
   kits:
   	description: List all of the available kits.
   	usage: /kits
   ukit:
   	description: Update a kit to your inventory, or optionally rename it.
-  	usage: /ukit [kitname] [newkitname]
+    usage: /ukit [kitname] [newkitname]
   dkit:
-  	description: Deletes the specificed kit.
-  	usage: /dkit [kitname]
+    description: Deletes the specificed kit.
+    usage: /dkit [kitname]
   kit:
-  	description: Use the kit or Give it to someone else.
-  	usage: /kit [kitname] [targetplayer]
+    description: Use the kit or Give it to someone else.
+    usage: /kit [kitname] [targetplayer]
     
 permissions:
   cobrakits.*:
