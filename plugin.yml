@@ -12,12 +12,12 @@ commands:
     usage: /ckit [kitname]
   lkit:
     description: List all of the available kits.
-  	usage: /lkit
+    usage: /lkit
   kits:
-  	description: List all of the available kits.
-  	usage: /kits
+    description: List all of the available kits.
+    usage: /kits
   ukit:
-  	description: Update a kit to your inventory, or optionally rename it.
+    description: Update a kit to your inventory, or optionally rename it.
     usage: /ukit [kitname] [newkitname]
   dkit:
     description: Deletes the specificed kit.
