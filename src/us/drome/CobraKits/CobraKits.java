@@ -531,6 +531,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//If the target is online and the sender has give permissions, give the target player the kit.
 			} else if (sender.hasPermission("cobrakits.give") && kitList.containsKey(kitname)) {
 				applyKit(target, kitname, sender, silent, concat);	
+				return;
 			}
 		}
 		
