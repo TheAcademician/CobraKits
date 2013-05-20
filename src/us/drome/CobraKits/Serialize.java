@@ -13,8 +13,8 @@ import net.minecraft.server.v1_5_R3.NBTTagList;
 import org.bukkit.craftbukkit.v1_5_R3.inventory.CraftItemStack;
 import org.bukkit.inventory.ItemStack;
 /*
- * Modified form of ItemSerialization by Comphenix - https://gist.github.com/4102407
- */
+* Modified form of ItemSerialization by Comphenix - https://gist.github.com/4102407
+*/
 public class Serialize {
     public static String toBase64(ItemStack[] inventory) {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -27,7 +27,7 @@ public class Serialize {
             CraftItemStack craft = getCraftVersion(inventory[i]);
             
             // Convert the item stack to a NBT compound
-            if (craft != null && craft.getAmount() != 0) 
+            if (craft != null && craft.getAmount() != 0)
                 CraftItemStack.asNMSCopy(craft).save(outputObject);
             itemList.add(outputObject);
         }
@@ -50,8 +50,8 @@ public class Serialize {
             // IsEmpty
             if (!inputObject.isEmpty()) {
                 inventory[i] = CraftItemStack.asCraftMirror(net.minecraft.server.v1_5_R3.ItemStack.createStack(inputObject));
-                		//CraftItemStack.asCraftMirror(ItemStack.a(inputObject));
-                		//new CraftItemStack(net.minecraft.server.v1_4_6.ItemStack.a(inputObject));
+                 //CraftItemStack.asCraftMirror(ItemStack.a(inputObject));
+                 //new CraftItemStack(net.minecraft.server.v1_4_6.ItemStack.a(inputObject));
             }
         }
         

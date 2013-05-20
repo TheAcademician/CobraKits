@@ -1,5 +1,27 @@
+===5/19/2013 Beta .9
+*Kits.yml Update!
+*kits.bin has been replace with kits.yml
+	**Conversion to kits.yml is automatic on first load of this version, and will not be included in later versions due to dependency on server version.
+	**kits.yml is editable by the user if they want to change settings out of game, just follow the format!
+	**With this change, Cobrakits will no longer need to be updated to each specific Bukkit edition as it releases.'
+*Kit name are now Owner.Kitname instead of Owner;Kitname
+*Permissions now inherit. ie: Someone with .useall will now also have .use, without needing to specify it.
+*First-Time Login Kits changes
+	** Now can set up more than one first-time login kit.
+	** /ckits startkit +<kitname> will add to the list, /ckits startkit -<kitname> will remove it
+	** They will be applied in order, with concat option.
+*NEW - Login Kits
+	** Just like First-Time Login kits, but will only apply to users who have logged in before.
+	** /ckits loginkit +<kitname> to add, /ckits loginkit -<kitname> to remove.
+	** They are applied in order, with concat option so they do not overrid current inventories.
+*NEW - Rename kits with /rkit, functionality removed from /ukit
+	** /rkit <oldname> <newname>
+	** Permissions: CobraKits.rename, CobraKits.renameall
+	** Can specify your own Personal kit ie: /rkit <kitname> <nename>, or with .renamall, specify the full name ie: /rikit <owner>.<kitname> <newowner>.<newkitname>
+	** To make a kit Global with renaming, you must now use /rkit <owner>.<kitname> Global.<kitname>
+*Tons of behind-the-scenes code improvements :D
 ===5/7/2013 Beta .8
-*Compatability update for 1.5.2!
+*Compatibility update for 1.5.2!
 ===3/20/2013 Beta .8
 *Compatibility update for 1.5.1!
 ===3/20/2013 Beta .8

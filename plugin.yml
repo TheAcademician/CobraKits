@@ -1,6 +1,6 @@
 name: CobraKits
 main: us.drome.CobraKits.CobraKits
-version: .8
+version: .9
 author: TheAcademician
 
 commands:
@@ -17,8 +17,11 @@ commands:
     description: List all of the available kits.
     usage: /kits
   ukit:
-    description: Update a kit to your inventory, or optionally rename it.
-    usage: /ukit [kitname] [newkitname]
+    description: Update a kit to your inventory.
+    usage: /ukit [kitname]
+  rkit:
+    description: Rename a kit.
+    usage: /rkit [kitname] [newname]
   dkit:
     description: Deletes the specificed kit.
     usage: /dkit [kitname]
@@ -31,8 +34,11 @@ permissions:
     description: Give access to all CobraKits commands
     children:
       cobrakits.create: true
+      cobrakits.createall: true
       cobrakits.update: true
       cobrakits.updateall: true
+      cobrakits.rename: true
+      cobrakits.renameall: true
       cobrakits.use: true
       cobrakits.useall: true
       cobrakits.delete: true
@@ -42,21 +48,46 @@ permissions:
   cobrakits.create:
     description: Allows player to create a kit
     default: op
+  cobrakits.createall:
+    children:
+      cobrakits.create: true
+    description: Allows player to create global kits.
+    default: op
   cobrakits.update:
     description: Allows player to update an existing kit
+    default: op
+  cobrakits.updateall:
+    children:
+      cobrakits.update: true
+    description: Allows player to update any kit.
+    default: op
+  cobrakits.rename:
+    description: Allows a player to rename a kit.
+    default: op
+  cobrakits.renameall:
+    children:
+      cobrakits.rename: true
+    description: Allows a player to rename any kit.
     default: op
   cobrakits.use:
     description: Allows player to use their kits
     default: op
   cobrakits.useall:
+    children:
+      cobrakits.use: true
     description: Allows player to use any kit
     default: op
   cobrakits.delete:
     description: Allows player to delete their kits
     default: op
   cobrakits.deleteall:
+    children:
+      cobrakits.delete: true
     description: Allows player to delete any kit
     default: op
   cobrakits.give:
     description: Allows player to give kits to other players.
+    default: op
+  cobrakits.cooldown.bypass:
+    description: Allows the player to not be affected by kit cooldowns
     default: op

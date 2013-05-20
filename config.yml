@@ -6,4 +6,7 @@ silent:
   always: false
 concat:
   always: false
-startkit: none
+startkits:
+  -
+loginkits:
+  -
