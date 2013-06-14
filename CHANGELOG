@@ -1,3 +1,44 @@
+===6/13/2013 Release 1.0
+*NEW - Respawn Kits
+	**Now you can supply kits to players on respawn!
+	**Configured just like First-Time and Login kits.
+	**Requires cobrakits.respawn or cobrakits.respawn.[kitname] permissions.
+*Login Kits
+	**Configured to use cobrakits.login or cobrakits.login.[kitname] permissions.
+*NEW - Kit Potions
+	**Can now add potion effects to your kits!
+	**The effects are automatically captured, you just need to drink the potions.
+	**Capture is specified by the -p/-potions flags on either /ckit OR /ukit.
+*NEW - Per-kit Cooldowns
+	**All kits can now have independent cooldowns!
+	**Global cooldown setting will override individual cooldowns.
+	**Set a cooldown, in seconds, using the -cd/-cooldown flags with either /ckit OR /ukit.
+	**Takes effect if used with a kit sign or /kit.
+	**Is displayed to the right of the kit name in the kit list.
+	**Can be bypassed like global cooldown with cobrakits.cooldown.bypass, and now the new cobrakits.cooldown.bypass.[kitname] permission.
+*NEW - Kit Costs
+	**Simple item exchange system.
+	**Set using the -kc/-cost flags with either /ckit OR /ukit.
+	**Syntax: -cost [itemID]:[amount]
+	**Functions with /kit and is displayed on kit signs as well.
+	**Is displayed to the right of the kit name in the kit list.
+	**Can be bypass with cobrakits.cost.bypass or cobrakits.cost.bypass.[kitname] permissions.
+*Kit Signs
+	**Now displays kit cost, if set.
+	**New permission, cobrakits.sign.use.[kitname on sign]
+	**The kitname specified must be as it is on the sign!
+*NEW - Server Kits
+	**An alternative to Global kits, these are hidden from anyone without cobrakits.* permission.
+	**Can be used just like Global kits for respawn, first-time, and login kits as well as kit signs.
+	**Frees up Global kits to be used only as kits for all users.
+	**Cannot be used directly by anyone without cobrakits.* permission.
+*Renaming Kits
+	**Added ability to use some flags when renaming kits, with the advent of Server kits.
+	**Requires the user to have cobrakits.renameall permission.
+	**/ukit [oldname] -sk/-server will change the kit owner to Server, but retain the old kit name. ie: Global.test would become Server.test.
+	**/ukit [oldname] -g/-global will change the kit owner to Global, but retain the old kit name.
+*Improved Help
+	**Run /ckits help [command] (without the /) to retrieve usage info, supported flags, and any permissions needed for most commands.
 ===5/19/2013 Beta .9
 *Kits.yml Update!
 *kits.bin has been replace with kits.yml

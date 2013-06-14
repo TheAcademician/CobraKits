@@ -4,12 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.Collator;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.logging.Level;
 
 import org.bukkit.ChatColor;
@@ -26,6 +23,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.event.Listener;
@@ -52,11 +50,17 @@ public class CobraKits extends JavaPlugin implements Listener {
 	private int cooldownDuration = 0;
 	private ArrayList<String> startkits = new ArrayList<String>();
 	private ArrayList<String> loginkits = new ArrayList<String>();
+	private ArrayList<String> respawnkits = new ArrayList<String>();
 	//ArrayList to temporarily store player's names that are on cooldown.
-	private ArrayList<String> cooldownList = new ArrayList<String>();
+	private ArrayList<ArrayList<Object>> cooldownList = new ArrayList<ArrayList<Object>>();
 	
 	public void onEnable(){
 		getLogger().info("version " + getDescription().getVersion() + " is loading...");
+		File kitsBin = new File(getDataFolder() + File.separator + "kits.bin");
+		if(kitsBin.exists()){
+			getLogger().info("Detected kits.bin. You must convert kits.bin to kits.yml using CobraKits Beta .9 and CraftBukkit 1.5.2 before this version will load.");
+			getPluginLoader().disablePlugin(this);
+		}
 		try{
 			//Save the default configuration.
 			saveDefaultConfig();
@@ -68,6 +72,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			cooldownDuration = getConfig().getInt("cooldown.duration");
 			startkits = (ArrayList<String>) getConfig().getStringList("startkits");
 			loginkits = (ArrayList<String>) getConfig().getStringList("loginkits");
+			respawnkits = (ArrayList<String>) getConfig().getStringList("respawnkits");
 			
 			kitsDByml = new File(getDataFolder() + File.separator + "kits.yml");
 			//If kits.yml does not exist, create it.
@@ -76,10 +81,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			kitsDB = YamlConfiguration.loadConfiguration(kitsDByml);
 			//load the kitList with the values from kitsDB.
 			kitList = LoadKits();
-			
-			//Convert any kits.bin file present to the new kits.yml format.
-			ConvertToYML();
-			
+
 			//Confirm that all specified startkits from config.yml are in the kitList.
 			if(startkits.size() > 0 ) {
 				for(String entry: startkits) {
@@ -98,6 +100,17 @@ public class CobraKits extends JavaPlugin implements Listener {
 						//If the kit is not in kitList, clear the config.yml entry.
 						getConfig().set(entry, null);
 						getLogger().info("Configured Login Kit " + entry + " is not valid, clearing it.");
+					}
+				}
+			}
+			
+			//Confirm that all specified respawnkits from config.yml are in the kitList.
+			if(respawnkits.size() > 0) {
+				for(String entry: respawnkits) {
+					if(entry !=null && !kitList.contains(entry)) {
+						//If the kit is not in kitList, clear the config.yml entry.
+						getConfig().set(entry, null);
+						getLogger().info("Configured Respawn Kit " + entry + " is not valid, clearing it.");
 					}
 				}
 			}
@@ -128,7 +141,12 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//Iterate through every kit name by getting a list of keys belonging to the owner's section of the config.
 			for(String name : kitsDB.getConfigurationSection(owner).getKeys(false)) {
 				//Add a new Kit to loadingList with the owner, name, and the Lists containing inventory and armor ItemStack[] values.
-				loadingList.add(new Kit(owner, name, kitsDB.getList(owner + "." + name + ".Inventory"), kitsDB.getList(owner + "." + name + ".Armor")));
+				loadingList.add(new Kit(owner, name,
+						kitsDB.getList(owner + "." + name + ".Inventory"),
+						kitsDB.getList(owner + "." + name + ".Armor"),
+						kitsDB.getList(owner + "." + name + ".Potions"),
+						kitsDB.getInt(owner + "." + name + ".Cooldown"),
+						kitsDB.getItemStack(owner + "." + name + ".Cost")));
 			}
 		}
 		getLogger().info("has successfully loaded " + loadingList.size() + " kits!");
@@ -149,10 +167,16 @@ public class CobraKits extends JavaPlugin implements Listener {
 			if(!kitsDB.contains(entry.Owner() + "." + entry.Name() + ".Armor")) {
 				kitsDB.createSection(entry.Owner() + "." + entry.Name() + ".Armor");
 				kitsDB.createSection(entry.Owner() + "." + entry.Name() + ".Inventory");
+				kitsDB.createSection(entry.Owner() + "." + entry.Name() + ".Potions");
+				kitsDB.createSection(entry.Owner() + "." + entry.Name() + ".Cooldown");
+				kitsDB.createSection(entry.Owner() + "." + entry.Name() + ".Cost");
 			}
 			//Set the .Armor and .Inventory keys. As they are stored as ItemStack[] in the Kit, call a custom method to return them as a List, which can be saved to the config file.
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Armor", entry.ArmorAsList());
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Inventory", entry.InventoryAsList());
+			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Potions", entry.Potions());
+			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Cooldown", entry.Cooldown());
+			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Cost", entry.Cost());
 		}
 		//Save the in-memory kitsDB data to the kits.yml file via the kitsDByml object.
 		try {
@@ -177,8 +201,21 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//Iterate through the loginkits List and apply any kits. Loginkits are applied silently (true) and concatenate with the current inventory (true).
 			for(String kit : loginkits) {
 				if(kitList.contains(kit))
-					applyKit(login.getPlayer(), kit, login.getPlayer(), true, true);
+					if(login.getPlayer().hasPermission("cobrakits.login") || login.getPlayer().hasPermission("cobrakits.login." + kit)) {
+						applyKit(login.getPlayer(), kit, login.getPlayer(), true, true);
+					}
 			}
+		}
+	}
+	
+	//When someone respawns after a death, attempt to apply any respawn kits to the player.
+	@EventHandler
+	public void respawnDetector(PlayerRespawnEvent respawn) {
+		for(String kit : respawnkits) {
+			if(kitList.contains(kit))
+				if(respawn.getPlayer().hasPermission("cobrakits.respawn") || respawn.getPlayer().hasPermission("cobrakits.respawn." + kit)) {
+					applyKit(respawn.getPlayer(), kit, respawn.getPlayer(), true, true);
+				}
 		}
 	}
 	
@@ -188,13 +225,16 @@ public class CobraKits extends JavaPlugin implements Listener {
 		//When a sign is created, if it matches the proper syntax, check permissions and see if the kitname is valid.
 		if(ChatColor.stripColor(sign.getLine(0)).equalsIgnoreCase("[COBRAKIT]") || ChatColor.stripColor(sign.getLine(0)).equalsIgnoreCase("[KIT]")) {
 			if(sign.getPlayer().hasPermission("cobrakits.sign.create")) {
-				if(kitList.contains(sign.getLine(2)) && !sign.getLine(2).contains(":")) {
+				if(kitList.contains(sign.getLine(2)) && !sign.getLine(2).contains(".")) {
 					//If the kit is valid, we format the sign to show the user it is enabled.
 					if(sign.getLine(0).equalsIgnoreCase("[COBRAKIT]"))
 						sign.setLine(0, ChatColor.DARK_RED + "" + ChatColor.BOLD + "[COBRAKIT]");
 					if(sign.getLine(0).equalsIgnoreCase("[KIT]"))
 						sign.setLine(0, ChatColor.DARK_RED + "" + ChatColor.BOLD + "[KIT]");
-					sign.setLine(1, "");
+					ItemStack cost = kitList.get(kitList.indexOf(sign.getLine(2))).Cost();
+					if(cost != null) {
+						sign.setLine(1, ChatColor.DARK_PURPLE + String.valueOf(cost.getAmount()) + " " + cost.getType().toString());
+					} else { sign.setLine(1, ""); }
 					sign.setLine(2, ChatColor.DARK_BLUE + sign.getLine(2));
 					String signOptions ="";
 					if(sign.getLine(3).contains("c"))
@@ -213,7 +253,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 						sign.setLine(x, "");
 					}
 					sign.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + sign.getLine(2) + ChatColor.LIGHT_PURPLE + ", does not exist or is a Personal kit. Use "
-					+ ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available Global kits, marked by " + ChatColor.GREEN + "*" + ChatColor.AQUA + ":");
+					+ ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "where Global kits are shown as Green.");
 				}
 			} else {
 				//If the player doesn't have permission to make kit signs, blank the sign and send error message.
@@ -236,10 +276,10 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//If the block interacted by the player is a sign of either wall or post type, continue.
 			Sign sign = (Sign)b.getState();
 			if(ChatColor.stripColor(sign.getLine(0)).equals("[COBRAKIT]") || ChatColor.stripColor(sign.getLine(0)).equals("[KIT]")) {
-				//If the kit sign matches the required syntax, determine if the player has permission to use it.
-				if(e.getPlayer().hasPermission("cobrakits.sign.use")) {
-					//Check the kitList to see if it contains the kitname, after formatting is removed.
-					if(kitList.contains(ChatColor.stripColor(sign.getLine(2)))) {
+				//If the kit sign matches the required syntax, check and see if the kit is still valid.
+				if(kitList.contains(ChatColor.stripColor(sign.getLine(2)))) {
+					//With a valid kit, check permissions to see if the player can use this sign.
+					if(e.getPlayer().hasPermission("cobrakits.sign.use") || e.getPlayer().hasPermission("cobrakits.sign.use." + ChatColor.stripColor(sign.getLine(2)))) {
 						Boolean[] options = new Boolean[2];
 						//Here, check to see if either the concat or silent flags are set to ON.
 						if(!sign.getLine(3).isEmpty()) {
@@ -251,10 +291,10 @@ public class CobraKits extends JavaPlugin implements Listener {
 						//Send the applyKit method the required arguments, including kitname, and the silent and concat options.
 						applyKit(e.getPlayer(), ChatColor.stripColor(sign.getLine(2)), e.getPlayer(), (options[0] != null) ? options[0] : false, (options[1] != null) ? options[1] : false);
 					} else {
-						e.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + sign.getLine(2) + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+						e.getPlayer().sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
 					}
 				} else {
-					e.getPlayer().sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
+					e.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + sign.getLine(2) + ChatColor.LIGHT_PURPLE + ", does not exist. Please update this sign to use a valid kit.");
 				}
 			}
 		}
@@ -262,15 +302,62 @@ public class CobraKits extends JavaPlugin implements Listener {
 
 	
 	//Method that displays the /ckits help command output which details usage info for the various commands.
-	private void helpInfo(CommandSender sender) {
-		sender.sendMessage("- " + ChatColor.RED + "CobraKits" + ChatColor.WHITE + " - v" + getDescription().getVersion() + " - Developed by " + ChatColor.LIGHT_PURPLE + "TheAcademician" + ChatColor.WHITE + ".");
-		sender.sendMessage(ChatColor.RED + "/lkit or /kits " + ChatColor.WHITE + ": List all kits that you can use.");
-		sender.sendMessage(ChatColor.RED + "/ckit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Make a kit based on your inventory.");
-		sender.sendMessage(ChatColor.RED + "/ukit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Update a kit.");
-		sender.sendMessage(ChatColor.RED + "/rkit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[newname]" + ChatColor.WHITE + ": Rename a kit.");
-		sender.sendMessage(ChatColor.RED + "/dkit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Deletes this kit. " + ChatColor.RED + "This is permanent!!!");
-		sender.sendMessage(ChatColor.RED + "/kit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[username]" + ChatColor.WHITE + ": Use/Give the specified kit.");
-		sender.sendMessage(ChatColor.RED + "Kit List Color Guide: " + ChatColor.GREEN + "Global Kits" + ChatColor.RED + ", " + ChatColor.GOLD + "Personal Kits" + ChatColor.RED + ", " + ChatColor.AQUA + "Other's Personal Kits");
+	private void helpInfo(CommandSender sender, Args args) {
+		if(args.Arg2().isEmpty()) {
+			sender.sendMessage("- " + ChatColor.RED + "CobraKits" + ChatColor.WHITE + " - v" + getDescription().getVersion() + " - Developed by " + ChatColor.LIGHT_PURPLE + "TheAcademician" + ChatColor.WHITE + ".");
+			sender.sendMessage(ChatColor.RED + "/lkit or /kits " + ChatColor.WHITE + ": List all kits that you can use.");
+			sender.sendMessage(ChatColor.RED + "/ckit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Make a kit based on your inventory.");
+			sender.sendMessage(ChatColor.RED + "/ukit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Update a kit.");
+			sender.sendMessage(ChatColor.RED + "/rkit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[newname]" + ChatColor.WHITE + ": Rename a kit.");
+			sender.sendMessage(ChatColor.RED + "/dkit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Deletes this kit. " + ChatColor.RED + "This is permanent!!!");
+			sender.sendMessage(ChatColor.RED + "/kit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[username]" + ChatColor.WHITE + ": Use/Give the specified kit.");
+			sender.sendMessage(ChatColor.RED + "Kit List Colors: " + ChatColor.DARK_PURPLE + "Server" + ChatColor.RED + ", " + ChatColor.GREEN + "Global" + ChatColor.RED + ", " + ChatColor.GOLD + "Personal" + ChatColor.RED + ", " + ChatColor.AQUA + "Other's Kits");
+			sender.sendMessage(ChatColor.RED + "Run /ckit help " + ChatColor.AQUA + "[command]" + ChatColor.RED + " to view more information about it.");
+		} else {
+			switch (args.Arg2().toLowerCase()) {
+			case "lkit": //passthrough
+			case "kits":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/lkit or /kits");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.WHITE + "none");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "Directly tied to kit use permissions.");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Colors: " + ChatColor.DARK_PURPLE + "Server" + ChatColor.RED + ", " + ChatColor.GREEN + "Global" + ChatColor.RED + ", " + ChatColor.GOLD + "Personal" + ChatColor.RED + ", " + ChatColor.AQUA + "Other's Kits");
+				break;
+			case "ckit":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/ckit " + ChatColor.AQUA + "[kitname]");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-g/-global: " + ChatColor.WHITE + "Create a Global Kit (requires .createall)");
+				sender.sendMessage(ChatColor.GREEN + "        -sk/-server: " + ChatColor.WHITE + "Create a Server Kit (requires .createall)");
+				sender.sendMessage(ChatColor.GREEN + "        -p/-potions: " + ChatColor.WHITE + "Capture active potion effects to the kit.");
+				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Add a cooldown to the kit.");
+				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [itemID]:[amount]: " + ChatColor.WHITE + "Specify a cost that must be paid to use the kit.");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.create, cobrakits.createall");
+				break;
+			case "ukit":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/ukit " + ChatColor.AQUA + "[kitname]");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-p/-potions: " + ChatColor.WHITE + "Updates or clears potion effects.");
+				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Change kit cooldown. Supply 0 to clear.");
+				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [itemID]:[amount]: " + ChatColor.WHITE + "Change the kit cost, or \"clear\".");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.update, cobrakits.updateall");
+				break;
+			case "rkit":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/rkit " + ChatColor.AQUA + "[old kitname] " + ChatColor.BLUE + "[new kitname]");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-g/-global: " + ChatColor.WHITE + "Change to a Global Kit, ignores [new kitname](requires .renameall)");
+				sender.sendMessage(ChatColor.GREEN + "        -sk/-server: " + ChatColor.WHITE + "Change to a Server Kit, ignores [new kitname] (requires .renameall)");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.rename, cobrakits.renameall");
+				break;
+			case "dkit":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/dkit " + ChatColor.AQUA + "[kitname]");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.WHITE + "none");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.delete, cobrakits.deleteall");
+				break;
+			case "kit":
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/kit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[target player]" + ChatColor.WHITE + " (requires .give)");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-s/-silent: " + ChatColor.WHITE + "Applies the kit without informing the receiver.");
+				sender.sendMessage(ChatColor.GREEN + "        -c/-concat: " + ChatColor.WHITE + "Add kit to the current inventory instead of replacing it.");
+				sender.sendMessage(ChatColor.GREEN + "        -g/-global: " + ChatColor.WHITE + "If a Global and Personal kit share a name, use the Global kit.");
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.use, cobrakits.useeall, cobrakits.use.[kitname], cobrakits.give");
+				break;
+			}
+		}
 	}
 	
 	//Method that displays the usage info when a player runs the /ckits command with no options.
@@ -279,11 +366,12 @@ public class CobraKits extends JavaPlugin implements Listener {
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "help" + ChatColor.WHITE + ": List all CobraKits commands.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "current" + ChatColor.WHITE + ": List current settings.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "cooldown" + ChatColor.WHITE + ": Toggle kit cooldowns.");
-		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "duration" + ChatColor.AQUA+ " [ticks]" + ChatColor.WHITE + ": Set cooldown in seconds.");
+		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "duration" + ChatColor.AQUA+ " [seconds]" + ChatColor.WHITE + ": Set cooldown in seconds.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "silent" + ChatColor.WHITE + ": Toggles silent kit give.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "concat" + ChatColor.WHITE + ": Toggles concatenation on give.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "startkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove first-time logon kits.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "loginkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove logon kits.");
+		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "respawnkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove respawn kits.");
 	}
 
 	
@@ -293,7 +381,8 @@ public class CobraKits extends JavaPlugin implements Listener {
 				usageInfo(sender);
 			} else if(args[0].equalsIgnoreCase("help")) {
 				//If the help option is specified, display help info for the various commands.
-				helpInfo(sender);
+				Args options = new Args(args);
+				helpInfo(sender, options);
 			} else if(sender.hasPermission("cobrakits.*")) {
 				switch (args[0].toLowerCase()) {
 					case "cooldown":
@@ -381,7 +470,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 								loginkits.clear();
 								getConfig().set("loginkits", null);
 								saveConfig();
-								sender.sendMessage(ChatColor.LIGHT_PURPLE + " The First-Time Login Kits list has been cleared.");
+								sender.sendMessage(ChatColor.LIGHT_PURPLE + " The Login Kits list has been cleared.");
 							} else {
 								//If the second argument begins with a "+" they want to add a kit to the loginkits List.
 								if(args[1].contains("+")) {
@@ -393,7 +482,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										loginkits.add(kitname);
 										getConfig().set("loginkits", loginkits);
 										saveConfig();
-										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the First-Time Login Kits list.");
+										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the Login Kits list.");
 									} else 
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 								//If the second argument begins with a "-" they want to remove a kit to the loginkits List.
@@ -414,10 +503,56 @@ public class CobraKits extends JavaPlugin implements Listener {
 						} else {
 							//If the user has not specified any arguments, display a list of all current loginkits entries.
 							if(loginkits.size() != 0) {
-								sender.sendMessage(ChatColor.LIGHT_PURPLE + "Current  Login Kits:");
+								sender.sendMessage(ChatColor.LIGHT_PURPLE + "Current Login Kits:");
 								sender.sendMessage(loginkits.toArray(new String[loginkits.size()]));
 							} else
 								sender.sendMessage(ChatColor.LIGHT_PURPLE + "You have no active Login Kits. Set one with " + ChatColor.RED + "/ckits loginkit +<kitname>");
+						}
+						break;
+					case "respawnkit":
+						if(args.length > 1) {
+							//If the user has specified the clear option, set the loginkits key to null.
+							if(args[1].equalsIgnoreCase("clear")) {
+								respawnkits.clear();
+								getConfig().set("respawnkits", null);
+								saveConfig();
+								sender.sendMessage(ChatColor.LIGHT_PURPLE + " The Respawn Kits list has been cleared.");
+							} else {
+								//If the second argument begins with a "+" they want to add a kit to the loginkits List.
+								if(args[1].contains("+")) {
+									//Remove the "+" from the kitname.
+									String kitname = args[1].substring(1);
+									//Check the kitList to see if the specified kitname is valid.
+									if(kitList.contains(kitname)) {
+										//If the kit exists, add the name to the loginkits List and save it to the config.
+										respawnkits.add(kitname);
+										getConfig().set("respawnkits", respawnkits);
+										saveConfig();
+										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the Respawn Kits list.");
+									} else 
+										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+								//If the second argument begins with a "-" they want to remove a kit to the loginkits List.
+								} else if(args[1].contains("-")) {
+									//Remove the "-" from the kitname.
+									String kitname = args[1].substring(1);
+									//Check the loginkits List to see if the specified kitname is present.
+									if(respawnkits.contains(kitname)) {
+										//If they kit exists, remove it from the loginkits list.
+										respawnkits.remove(kitname);
+										getConfig().set("respawnkits", respawnkits);
+										saveConfig();
+										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been removed from the Respawn Kits list.");
+									} else 
+										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", is not a Respawn Kit. Use " + ChatColor.RED + "/ckits respawnkits " + ChatColor.LIGHT_PURPLE + "to see the current kits.");
+								}
+							}
+						} else {
+							//If the user has not specified any arguments, display a list of all current loginkits entries.
+							if(respawnkits.size() != 0) {
+								sender.sendMessage(ChatColor.LIGHT_PURPLE + "Current Respawn Kits:");
+								sender.sendMessage(respawnkits.toArray(new String[respawnkits.size()]));
+							} else
+								sender.sendMessage(ChatColor.LIGHT_PURPLE + "You have no active Respawn Kits. Set one with " + ChatColor.RED + "/ckits respawnkit +<kitname>");
 						}
 						break;
 					case "current":
@@ -431,6 +566,8 @@ public class CobraKits extends JavaPlugin implements Listener {
 						sender.sendMessage(startkits.toArray(new String[startkits.size()]));
 						sender.sendMessage(ChatColor.AQUA + "Login Kits:");
 						sender.sendMessage(loginkits.toArray(new String[loginkits.size()]));
+						sender.sendMessage(ChatColor.AQUA + "Respawn Kits:");
+						sender.sendMessage(respawnkits.toArray(new String[respawnkits.size()]));
 						sender.sendMessage(ChatColor.RED + "------------------");
 						break;
 				}
@@ -468,20 +605,22 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 			return true;
 		} else if(cmd.getName().equalsIgnoreCase("ukit")) { //Update a kit
-			if(args.length == 1){
+			if(args.length >= 1){
 				if(sender.hasPermission("cobrakits.update")) {
+					Args options = new Args(args);
 					//If the player specified a kitname to update, and has the valid permissions, continue.
-					updateKit(sender, args[0]);
+					updateKit(sender, options);
 				} else {
 					sender.sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
 				}
 			} else { sender.sendMessage(ChatColor.RED + "/ukit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Update a kit."); }
 			return true;
 		} else if(cmd.getName().equalsIgnoreCase("rkit")) { //Rename a kit
-			if(args.length == 2) {
+			if(args.length >= 2) {
 				//If the player specified a kitname to rename, a new name, and has the valid permissions, continue.
 				if(sender.hasPermission("cobrakits.rename")) {
-					renameKit(sender, args);
+					Args options = new Args(args);
+					renameKit(sender, options);
 				} else {
 					sender.sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
 				}
@@ -521,6 +660,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		List<String> listReply = new ArrayList<String>();
 		//Create String lists to contain all kits the user can access, one for each type of kit so they can be colored and organized.
 		List<String> globalKits = new ArrayList<String>();
+		List<String> serverKits = new ArrayList<String>();
 		List<String> myKits = new ArrayList<String>();
 		List<String> availableKits = new ArrayList<String>();
 		//Iterate through every Kit in kitList.
@@ -530,46 +670,64 @@ public class CobraKits extends JavaPlugin implements Listener {
 				//If the player is op or has .useall, filter all Personal, Global, and Available kits.
 				if(sender.hasPermission("cobrakits.useall")) {
 					if(entry.Owner().equals("Global")) {
-						globalKits.add(ChatColor.GREEN + entry.Name());
+						globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 					} else if(entry.Owner().equals(sender.getName())){
-						myKits.add(ChatColor.GOLD +  entry.Name());
+						myKits.add(ChatColor.GOLD +  entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+					} else if(entry.Owner().equals("Server")) {
+						if(sender.hasPermission("cobrakits.*")) {
+							serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+						}
 					} else {
-						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name());
+						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 					}
 				//With .use, a player has access to all Global and their own Personal kits, sort them out here.
 				} else if(sender.hasPermission("cobrakits.use") && !sender.hasPermission("cobrakits.useall")) {
 					if(entry.Owner().equals("Global")) {
-						globalKits.add(ChatColor.GREEN + entry.Name());
+						globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 					} else if(entry.Owner().equals(sender.getName())){
-						myKits.add(ChatColor.GOLD +  entry.Name());
+						myKits.add(ChatColor.GOLD +  entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 					}
 				//If the player has a specific kit's permission (cobrakits.kitname) sort it out here.
-				} else if(sender.hasPermission("cobrakits." + entry) && !sender.hasPermission("cobrakits.useall")) {
-					if(entry.Owner().equals(sender.getName()))
-						myKits.add(ChatColor.GOLD + entry.Name());
-					else
-						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name());
-				//If the player has no permission to use any kits, send a permissions error.
-				} else {
-					sender.sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
-					return;
+				} else if(sender.hasPermission("cobrakits." + entry.Owner() + "." + entry.Name()) && !sender.hasPermission("cobrakits.useall")) {
+						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 				}
 			//If the console ran the command, separate out only Global kits.
 			} else {
-				if(entry.Owner().equals("Global")) {
-					globalKits.add(ChatColor.GREEN + entry.Name());
+				if(entry.Owner().equals("Sever")) {
+					serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+				} else if(entry.Owner().equals("Global")) {
+					globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 				} else {
-					availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name());
+					availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
+							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 				}
 			}
 		}
 		//Sort all the kit lists a-z
 		java.util.Collections.sort(globalKits, Collator.getInstance());
+		java.util.Collections.sort(serverKits, Collator.getInstance());
 		java.util.Collections.sort(myKits, Collator.getInstance());
 		java.util.Collections.sort(availableKits, Collator.getInstance());
-		//Add Personal kits to the full kit list, then Global kits. This is to keep the list shown to the player in order of Personal -> Global -> Other's
+		//Add Personal kits to the full kit list, then Server and Global kits. This is to keep the list shown to the player in order of Personal -> Server -> Global -> Other's
 		availableKits.addAll(0, globalKits);
+		availableKits.addAll(0, serverKits);
 		availableKits.addAll(0, myKits);
+		
+		//If the player has no permission to use any kits, send a permissions error.
+		if(availableKits.size() == 0) {
+			sender.sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
+			return;
+		}
+		
 		//Since the chat window can only display 10 lines, reduce the length of the kit list to 8, depending on if a page is specified.
 		int page = 0;
 		//Attempt to parse out an page number from the arguments. try/catch prevents error if non-numerial characters are entered.
@@ -608,18 +766,36 @@ public class CobraKits extends JavaPlugin implements Listener {
 	 * Create Function - Take the player's inventory and store it in the kitList as a new Kit.
 	 */
 	private void createKit(Player player, Args args){
-		//Retrieve an instance of the player's inventory.
-		PlayerInventory inventory = player.getInventory();
 		//Force player data to be saved. The ensures inventory is up-to-date.
 		//Without this, recently moved ItemStacks can create duplicates in saved kits.
 		player.saveData();
 		
+		//Retrieve an instance of the player's inventory.
+		PlayerInventory inventory = player.getInventory();
+		
+		//If the -sk/-server flag was specified and the player has permission, create a Server kit.
+		if(args.Server() && player.hasPermission("cobrakits.*")) {
+			//If the kitList doesn't already have a Server kit with that name, proceed.
+			if(!kitList.contains("Server." + args.Arg1())) {
+				//add a new Kit to the kitList, specifying the owner (Server), the kitname, and the player's current inventory, as well as Potions and Costif the flag is set.
+				kitList.add(new Kit("Server", args.Arg1(),
+						inventory.getContents(), inventory.getArmorContents(),
+						(args.Potions() ? maxDurationEffects(player.getActivePotionEffects()) : null),
+						(args.Cooldown() >= 0 ? args.Cooldown() : 0), args.Cost()));
+				SaveKits();
+				player.sendMessage(ChatColor.LIGHT_PURPLE + "Server Kit " + ChatColor.AQUA + args.Arg1() + ChatColor.LIGHT_PURPLE + " has been created!");
+			} else {
+				player.sendMessage(ChatColor.LIGHT_PURPLE + "A kit named " + ChatColor.AQUA + args.Arg1().replace(":", "") + ChatColor.LIGHT_PURPLE + ", already exists.");
+			}
 		//If the -g/-global flag was specified and the player has permission, create a Global kit.
-		if(args.Global() && player.hasPermission("cobrakits.createall")) {
+		} else if(args.Global() && player.hasPermission("cobrakits.createall")) {
 			//If the kitList doesn't already have a Global kit with that name, proceed.
-			if(!kitList.contains(args.Arg1())) {
-				//add a new Kit to the kitList, specifying the owner (Global), the kitname, and the player's current inventory.
-				kitList.add(new Kit("Global", args.Arg1(), inventory.getContents(), inventory.getArmorContents()));
+			if(!kitList.contains("Global." + args.Arg1())) {
+				//add a new Kit to the kitList, specifying the owner (Global), the kitname, and the player's current inventory, as well as Potions and Cost if the flag is set.
+				kitList.add(new Kit("Global", args.Arg1(),
+						inventory.getContents(), inventory.getArmorContents(),
+						(args.Potions() ? maxDurationEffects(player.getActivePotionEffects()) : null),
+						(args.Cooldown() >= 0 ? args.Cooldown() : 0), args.Cost()));
 				SaveKits();
 				player.sendMessage(ChatColor.LIGHT_PURPLE + "Global Kit " + ChatColor.AQUA + args.Arg1() + ChatColor.LIGHT_PURPLE + " has been created!");
 			} else {
@@ -629,8 +805,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 		} else {
 			//Check the kitList to make sure it doesn't contain a playername.kitname combination already
 			if(!kitList.contains(player.getName() + "." + args.Arg1())) {
-				//add a new Kit to the kitList, specifying the owner (player's name), the kitname, and the player's current inventory.
-				kitList.add(new Kit(player.getName(), args.Arg1(), inventory.getContents(), inventory.getArmorContents()));
+				//add a new Kit to the kitList, specifying the owner (player's name), the kitname, and the player's current inventory, as well as Potions and Cost if the flag is set.
+				kitList.add(new Kit(player.getName(), args.Arg1(),
+						inventory.getContents(), inventory.getArmorContents(),
+						(args.Potions() ? maxDurationEffects(player.getActivePotionEffects()) : null),
+						(args.Cooldown() >= 0 ? args.Cooldown() : 0), args.Cost()));
 				SaveKits();
 				player.sendMessage(ChatColor.LIGHT_PURPLE + "Personal Kit " + ChatColor.AQUA + args.Arg1() + ChatColor.LIGHT_PURPLE + " has been created!");
 			} else {
@@ -642,8 +821,9 @@ public class CobraKits extends JavaPlugin implements Listener {
 	/*
 	 * Update Function - Replace an existing kit with the contents of the player's inventory
 	 */
-	private void updateKit(CommandSender sender, String kitname) {
+	private void updateKit(CommandSender sender, Args args) {
 		if(sender instanceof Player){
+			String kitname = args.Arg1();
 			//Retrieve an instance of the player who send the command.
 			Player player = (Player)sender;
 			//Retrieve an instance of the player's inventory.
@@ -657,7 +837,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 				Kit temp = kitList.get(kitList.indexOf(player.getName() + "." + kitname));
 				kitsToRemove.add(temp); //Set the old kit record to be cleaned from the yml file.
 				//Set the Kit at the index of playername.kitname to a new Kit object retaining the cached owner and name, and replacing it with the players current inventory.
-				kitList.set(kitList.indexOf(player.getName() + "." + kitname), new Kit(temp.Owner(), temp.Name(), inventory.getContents(), inventory.getArmorContents()));
+				kitList.set(kitList.indexOf(player.getName() + "." + kitname), new Kit(temp.Owner(), temp.Name(),
+						inventory.getContents(), inventory.getArmorContents(),
+						(args.Potions() ? maxDurationEffects(player.getActivePotionEffects()) : temp.Potions()),
+						(args.Cooldown() >= 0 ? args.Cooldown() : temp.Cooldown()),
+						(args.Cost() != null ? (args.Cost().getTypeId() != 0 ? args.Cost() : null) : temp.Cost())));
 				temp = null;
 				SaveKits();
 				player.sendMessage(ChatColor.LIGHT_PURPLE + "Personal Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been updated successfully.");
@@ -667,7 +851,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 				Kit temp = kitList.get(kitList.indexOf(kitname));
 				kitsToRemove.add(temp); //Set the old kit record to be cleaned from the yml file.
 				//Set the Kit at the index of kitname to a new Kit object retaining the cached owner and name, and replacing it with the players current inventory.
-				kitList.set(kitList.indexOf(kitname), new Kit(temp.Owner(), temp.Name(), inventory.getContents(), inventory.getArmorContents()));
+				kitList.set(kitList.indexOf(kitname), new Kit(temp.Owner(), temp.Name(),
+						inventory.getContents(), inventory.getArmorContents(),
+						(args.Potions() ? maxDurationEffects(player.getActivePotionEffects()) : temp.Potions()),
+						(args.Cooldown() >= 0 ? args.Cooldown() : temp.Cooldown()),
+						(args.Cost() != null ? (args.Cost().getTypeId() != 0 ? args.Cost() : null) : temp.Cost())));
 				temp = null;
 				SaveKits();
 				player.sendMessage(ChatColor.LIGHT_PURPLE + "Global Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been updated successfully.");
@@ -683,16 +871,21 @@ public class CobraKits extends JavaPlugin implements Listener {
 	/*
 	 * Rename Function - Allows player/console to rename an existing kit from the kitList.
 	 */
-	private void renameKit(CommandSender sender, String[] args) {
-		String kitname = args[0];
-		String newname = args[1];
+	private void renameKit(CommandSender sender, Args args) {
+		String kitname = args.Arg1();
+		String newname = args.Arg2();
+		
 		//Check the kitList to see if it contains playername.kitname. (sender can be either a player or console. If it is console, it will not be found and skip to the Else)
 		if(kitList.contains(sender.getName() + "." + kitname)) {
+			if(newname.contains(".")) {
+				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Personal kit names are not allowed to contain periods.");
+				return;
+			}
 			//If it does, cache the current Kit that is in the kitList (at index playername.kitname).
 			Kit temp = kitList.get(kitList.indexOf(sender.getName() + "." + kitname));
 			kitsToRemove.add(temp); //Set the old kit record to be cleaned from the yml file.
 			//Set the Kit at the index of playername.kitname to a new Kit object retaining the cached inventory and owner, and replacing the kitname with playername.newname
-			kitList.set(kitList.indexOf(sender.getName() + "." + kitname), new Kit(temp.Owner(), newname, temp.Inventory(), temp.Armor()));
+			kitList.set(kitList.indexOf(sender.getName() + "." + kitname), new Kit(temp.Owner(), newname, temp.Inventory(), temp.Armor(), temp.Potions(), temp.Cooldown(), temp.Cost()));
 			temp = null;
 			SaveKits();
 			sender.sendMessage(ChatColor.LIGHT_PURPLE + "Personal Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been renamed to " + ChatColor.AQUA + newname + ChatColor.LIGHT_PURPLE + ".");
@@ -701,13 +894,18 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//Cache the current Kit that is in the kitList (at index kitname).
 			Kit temp = kitList.get(kitList.indexOf(kitname));
 			kitsToRemove.add(temp); //Set the old kit record to be cleaned from the yml file.
-			//If the new name has a period the kit owner is also being changed.
-			if(newname.contains(".")){
+			if(args.Global()) { //Change the owner of the kit to Global
+				kitList.set(kitList.indexOf(kitname), new Kit("Global", temp.Name(), temp.Inventory(), temp.Armor(), temp.Potions(), temp.Cooldown(), temp.Cost()));
+				newname = "Global." + temp.Name();
+			} else if (args.Server()) { //Change the owner of the kit to Server
+				kitList.set(kitList.indexOf(kitname), new Kit("Server", temp.Name(), temp.Inventory(), temp.Armor(), temp.Potions(), temp.Cooldown(), temp.Cost()));
+				newname = "Server." + temp.Name();
+			} else if(newname.contains(".")) { //If the new name has a period the kit owner is also being changed.
 				//Set the Kit at the index of kitname to a new Kit object retaining the cached inventory, and replacing the owner and kitname with newname
-				kitList.set(kitList.indexOf(kitname), new Kit(newname.split("\\.")[0], newname.split("\\.")[1], temp.Inventory(), temp.Armor()));
+				kitList.set(kitList.indexOf(kitname), new Kit(newname.split("\\.")[0], newname.split("\\.")[1], temp.Inventory(), temp.Armor(), temp.Potions(), temp.Cooldown(), temp.Cost()));
 			} else {
 				//Set the Kit at the index of kitname to a new Kit object retaining the cached inventory and owner, and replacing the kitname with newname
-				kitList.set(kitList.indexOf(kitname), new Kit(temp.Owner(), newname, temp.Inventory(), temp.Armor()));
+				kitList.set(kitList.indexOf(kitname), new Kit(temp.Owner(), newname, temp.Inventory(), temp.Armor(), temp.Potions(), temp.Cooldown(), temp.Cost()));
 			}
 			temp = null;
 			SaveKits();
@@ -757,38 +955,29 @@ public class CobraKits extends JavaPlugin implements Listener {
 				sender.sendMessage(options.Arg2() + " is not online!");
 				return;
 			//If the target is online and the sender has give permissions, give the target player the kit.
-			} else if(sender.hasPermission("cobrakits.give") && kitList.contains(kitname)) {
-				applyKit(target, kitname, sender, silent, concat);	
-				return;
+			} else if(sender.hasPermission("cobrakits.give")) {
+				if(kitname.contains("Server.") && !sender.hasPermission("cobrakits.*")) {
+					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist, or you do not have permission to use it. Use "  + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+					return;
+				} else if(kitList.contains(kitname)) {
+					applyKit(target, kitname, sender, silent, concat);	
+					return;
+				} else {
+					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+					return;
+				}
 			} else {
-				sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+				sender.sendMessage("You do not have permission to give Kits.");
+				return;
 			}
 		}
 		
 		//If no target has been set, check to see if this is a player and then parse and apply kit according to permissions.
 		if(target == null) {
 			if(sender instanceof Player) {
-				//If the cooldown setting is enabled, and the user is not on cooldown, then run a delayed task for the cooldown duration.
-				final Player player = (Player)sender;
-				if(cooldownEnabled && !player.hasPermission("cobrakits.cooldown.bypass")) {
-					//If the player has the bypass permission we dont apply the cooldown.
-					if(!cooldownList.contains(player.getName())) {
-						//Otherwise, check if their name is in the cooldownList, if they are tell them they are on cooldown and how long they need to wait.
-						cooldownList.add(player.getName());
-						//Add the player to the cooldownList and start up the task, to last as much time as is specified by cooldownDuration.
-						getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
-							@Override
-							public void run() {
-								cooldownList.remove(player.getName());
-							}
-						}, Long.valueOf(cooldownDuration));
-					} else {
-						player.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that command every " + (cooldownDuration/20) + " seconds.");
-						return;
-					}
-				}
-
-				if(sender.hasPermission("cobrakits.useall") && kitList.contains(kitname)) {
+				if(kitname.contains("Server.") && !sender.hasPermission("cobrakits.*")) {
+					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist, or you do not have permission to use it. Use "  + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+			    } else if(sender.hasPermission("cobrakits.useall") && kitList.contains(kitname)) {
 					applyKit((Player)sender, kitname, sender, silent, concat);
 				} else if(sender.hasPermission("cobrakits." + kitname) && kitList.contains(kitname)) {
 					applyKit(((Player)sender), kitname, sender, silent, concat);
@@ -798,7 +987,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 					} else if (kitList.contains(sender.getName() + "." + kitname)) {
 						applyKit((Player)sender, sender.getName() + "." + kitname, sender, silent, concat);
 					} else {
-						sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
+						sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist, or you do not have permission to use it. Use "  + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 					}
 				} else {
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
@@ -807,8 +996,6 @@ public class CobraKits extends JavaPlugin implements Listener {
 			else {
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Only a Player can run that command!");
 			}
-		} else {
-				sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");				
 		}
 	}
 	
@@ -816,6 +1003,43 @@ public class CobraKits extends JavaPlugin implements Listener {
 	private void applyKit(Player target, String kitname, CommandSender sender, Boolean silent, Boolean concat) {
 		//Retrieve the Kit from the kitList at the index of the specified kitname.
 		Kit kit = kitList.get(kitList.indexOf(kitname));
+		
+		if(sender instanceof Player) {
+			if((cooldownEnabled || kit.Cooldown() > 0) && !(sender.hasPermission("cobrakits.cooldown.bypass" ) || sender.hasPermission("cobrakits.cooldown.bypass." + kit.Name()))) {
+				int cooldown = cooldownEnabled ? (cooldownDuration > 0 ? cooldownDuration : 0) : (kit.Cooldown() > 0 ? kit.Cooldown() : 0);
+				final ArrayList<Object> onCooldown = new ArrayList<Object>();
+				onCooldown.add(kit);
+				onCooldown.add(sender);
+				if(!cooldownList.contains(onCooldown)) {
+					cooldownList.add(onCooldown);
+					getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
+					@Override
+					public void run() {
+						cooldownList.remove(onCooldown);
+					}
+				}, Long.valueOf(cooldown));
+				} else {
+					int minutes = cooldown/20/60;
+					int seconds = (minutes > 0) ? (cooldown / 20 % 60) : (cooldown / 20);
+					if (minutes > 0) {
+						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that kit every " + minutes + " minutes" + ((seconds > 0) ? (" and " + seconds + " seconds.") : "."));
+					} else {
+						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that kit every " + seconds + " seconds.");
+					}
+					return;
+				}
+			}
+			
+			if(kit.Cost() != null && !(target.hasPermission("cobrakits.cost.bypass") || target.hasPermission("cobrakits.cost.bypass." + kit.Name()))) {
+				if(((Player)sender).getInventory().containsAtLeast(kit.Cost(), kit.Cost().getAmount())) {
+					((Player)sender).getInventory().remove(kit.Cost());
+				} else {
+					sender.sendMessage(ChatColor.LIGHT_PURPLE + "You cannot afford to use this kit. It costs: " + String.valueOf(kit.Cost().getAmount()) + " " + kit.Cost().getType().toString());
+					return;
+				}
+			}
+		}
+		
 		if(concat || concatEnabled){
 			//With the concat flag, a player's existing inventory will be preserved, items in the kit will be added to it.
 			ItemStack[] inventory = kit.Inventory();
@@ -875,7 +1099,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		} else {
 			target.getInventory().setContents(kit.Inventory());
 			target.getInventory().setArmorContents(kit.Armor());
-			//Set the player's inventory and armor contents by de-serializing the 0 and 1 indexes of the kitInven array
+			//Set the player's inventory and armor contents.
 		}
 		//If the silent flag has been set, do not send the apply message to the target player.
 		if(!(silent || silentEnabled)) {
@@ -888,159 +1112,31 @@ public class CobraKits extends JavaPlugin implements Listener {
 			for (PotionEffect effect : effects) {
 				target.removePotionEffect(effect.getType());
 			}
+			
+			//Apply any kit potion effects
+			if(kit.Potions() != null) {
+				target.addPotionEffects(kit.Potions());
+			}
+			
 			//Force player to update inventory. Without this sometimes kits will apply but appear invisible.
 			target.updateInventory();
 		}
-		
-		
 	}
-
-	private void ConvertToYML() {
-		Map<String, String[]> oldKitList = new HashMap<String, String[]>();
-		File kitsBin = new File(getDataFolder() + File.separator + "kits.bin");
-		if(kitsBin.exists()){
-			getLogger().info("Found kits.bin; beginning conversion to new kits.yml...");
-			try {
-				oldKitList = SLAPI.load(kitsBin.getPath());
-			} catch (Exception e) {
-				getLogger().info("Encountered error when trying to load kits.Bin. CobraKits cannot run without converting, unloading.");
-				getPluginLoader().disablePlugin(this);
-			}
-			for(Entry<String, String[]> entry : oldKitList.entrySet()) {
-				String owner = entry.getKey().contains(":") ? entry.getKey().split(":")[0] : "Global";
-				String name = entry.getKey().contains(":") ? entry.getKey().split(":")[1] : entry.getKey();
-				String[] kitInven = entry.getValue();
-				ItemStack[] inventory = Serialize.fromBase64(kitInven[0]);
-				ItemStack[] armor = Serialize.fromBase64(kitInven[1]);
-				Kit temp = new Kit(owner, name, inventory, armor);
-				if(!kitList.contains(temp)){
-					kitList.add(temp);
-				}
-			}
-			SaveKits();
-			if(kitsBin.delete()) {
-				getLogger().info("Your kits have all been moved to kits.yml! kits.bin has been removed!");
+	
+	private List<PotionEffect> maxDurationEffects(Collection<PotionEffect> PotionEffects){
+		List<PotionEffect> potionEffects = new ArrayList<PotionEffect>();
+		for(PotionEffect effect : PotionEffects) {
+			double maxDuration = 8 * 60 * 20 * effect.getType().getDurationModifier(); //The max potion duration is based off 8 minutes multiplied by the DurationModifier of the effect.
+			double baseDuration = maxDuration / (8.0 / 3.0); //The base duration for all potions, is the max possible duration multiplied by 8/3.
+			if(effect.getAmplifier() == 1) { 
+				//If the Amplifier is 1, this is a "II" potion which has the duration of the base, divided by 2.
+				potionEffects.add(new PotionEffect(effect.getType(), (int)(baseDuration / 2), 1));
 			} else {
-				getLogger().info("Your kits have all been moved to kits.yml! Couldn't delete kits.bin D:! Remove it before reloading this plugin!");
-			}
-		} else {
-			return;
-		}
-	}
-}
-
-/*
- *  Args Class
- *  Parses out the arguments provided to the ckit command into a more usable format in the form of public properties.
- */
-class Args{
-	//Private non-changable variables to hold the parsed values.
-	private String arg1 = "";
-	private String arg2 = "";
-	private Boolean concat = false;
-	private Boolean silent = false;
-	private Boolean global = false;
-	//Public properties to access the arguments.
-	public String Arg1() { return arg1; }
-	public String Arg2() { return arg2; }
-	public Boolean Concat() { return concat; }
-	public Boolean Silent() { return silent; }
-	public Boolean Global() { return global; }
-	
-	public Args(String[] args){
-		if(args.length > 0){
-			for(String entry : args){
-				//If the entry is a flag, determine which it is and set the Boolean values.
-				if(isFlag(entry)) {
-					if(entry.contentEquals("-c") || entry.contentEquals("-concat")) { concat = true; }
-					else if (entry.contentEquals("-s") || entry.contentEquals("-silent")) { silent = true; }
-					else if (entry.contentEquals("-g") || entry.contentEquals("-global")) { global = true; }
-					//If the entry is NOT a flag, and arg1 is empty, set it. Repeat for arg2.
-				} else if (arg1.isEmpty()) { arg1 = entry; }
-				else if (arg2.isEmpty()) { arg2 = entry; }
+				//There is sadly no API way to tell if the potion effect was initiated by a potion of Max (8, usually)) or Base (3, usually) length,
+				//So, to determine what the potion duration should be, check to see if the current duration is above the base, if it is, it must be a Max duration potion.
+				potionEffects.add(new PotionEffect(effect.getType(), (int)(effect.getDuration() > baseDuration ? maxDuration : baseDuration), 0));
 			}
 		}
-	}
-	
-	private boolean isFlag(String arg){
-		List<String> flags = Arrays.asList("-c", "-concat", "-s", "-silent", "-g", "-global");
-		//Compare each valid flag against the provided string.
-		for(String entry : flags){
-			if(arg.equalsIgnoreCase(entry)){ return true; }
-		}
-		return false;
+		return potionEffects;
 	}
 }
-
-//Custom class to store kit information. This can be modified to store more values.
-class Kit {
-	private String owner = "";
-	private String name = "";
-	private ItemStack[] inventory;
-	private ItemStack[] armor;
-	public String Owner() { return owner; }
-	public String Name() { return name; }
-	public ItemStack[] Inventory() { return inventory; }
-	public ItemStack[] Armor() { return armor; }
-	
-	public Kit(String Owner, String Name, ItemStack[] Inventory, ItemStack[] Armor) {
-		owner = Owner;
-		name = Name;
-		inventory = Inventory;
-		armor = Armor;
-	}
-	
-	//Other constructor that can take a generic List as input. This is needed for LoadKits() as the kits.yml file can only store Lists and not ItemStack[] directly.
-	public Kit(String Owner, String Name, List<?> Inventory, List<?> Armor) {
-		owner = Owner;
-		name = Name;
-		inventory = Inventory.toArray(new ItemStack[Inventory.size()]);
-		armor = Armor.toArray(new ItemStack[Armor.size()]);
-	}
-	
-	//Converts the inventory ItemStack[] to a list for the SaveKits() method, as you can only store Lists in configuration files.
-	ArrayList<ItemStack> InventoryAsList() {
-		return new ArrayList<ItemStack>(Arrays.asList(inventory));
-	}
-	
-	//Converts the armor ItemStack[] to a list for the SaveKits() method, as you can only store Lists in configuration files.	
-	ArrayList<ItemStack> ArmorAsList() {
-		return new ArrayList<ItemStack>(Arrays.asList(armor));
-	}
-}
-
-//Custom extension of ArrayList to handle kits. Necessary because default .contains and .indexOf required a specific Kit object to return useful input.
-class KitList extends ArrayList<Kit> {
-	private static final long serialVersionUID = 7480424712605617303L;
-
-	//Custom contains, only requires a kit name to search.
-	boolean contains(String Name) {
-		//Iterate through all kits in this list.
-		for(Kit entry: this) {
-			//If the owner of this kit is Global, check to see if the name matches the query.
-			if(entry.Owner().equals("Global") && entry.Name().equals(Name)) {
-				return true;
-			//If owner.kitname matches, return true;
-			} else if((entry.Owner() + "." + entry.Name()).equals(Name)) {
-				return true;
-			}
-		}
-		return false;
-	}
-	
-	//Custom indexOf, only requires a kit name to search.
-	int indexOf(String Name) {
-		//Iterate through all kits in this list.
-		for(Kit entry: this) {
-			//If the owner of this kit is Global, check to see if the name matches the query.
-			if(entry.Owner().equals("Global") && entry.Name().equals(Name)) {
-				return this.indexOf(entry);
-			//If owner.kitname matches, return true;
-			} else if((entry.Owner() + "." + entry.Name()).equals(Name)) {
-				return this.indexOf(entry);
-			}
-		}
-		return -1; //Always check .contains before running .indexOf or it will return -1 and cause a NullPointerException on any KitList.get() run if it doesnt exist.
-	}
-}
-

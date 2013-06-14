@@ -1,28 +1,36 @@
 name: CobraKits
 main: us.drome.CobraKits.CobraKits
-version: .9
+version: 1.0
 author: TheAcademician
+description: Allows the creation and use of pre-staged item kits.
+website: http://www.bukkit.org/server-mods/CobraKits
 
 commands:
   ckits:
     description: A dynamic kit plugin completely configurble in-game!
     usage: /ckits help|current|cooldown|duration|silent|concat [value]
   ckit:
+    permission: cobrakits.create
+    permission-message: You do not have permission to create Kits.
     description: Create a kit based on your current inventory.
-    usage: /ckit [kitname]
+    usage: /ckit [kitname] -kc [itemID:amount] -cd [cooldown]
   lkit:
     description: List all of the available kits.
     usage: /lkit
-  kits:
-    description: List all of the available kits.
-    usage: /kits
+    aliases: kits
   ukit:
+    permission: cobrakits.update
+    permission-message: You do not have permission to update Kits.
     description: Update a kit to your inventory.
-    usage: /ukit [kitname]
+    usage: /ukit [kitname] -kc [itemID:amount] -cd [cooldown]
   rkit:
+    permission: cobrakits.rename
+    permission-message: You do not have permission to rename Kits.
     description: Rename a kit.
     usage: /rkit [kitname] [newname]
   dkit:
+    permission: cobrakits.delete
+    permission-message: You do not have permission to delete Kits.
     description: Deletes the specificed kit.
     usage: /dkit [kitname]
   kit:
@@ -45,6 +53,9 @@ permissions:
       cobrakits.deleteall: true
       cobrakits.give: true
       cobrakits.cooldown.bypass: true
+      cobrakits.cost.bypass: true
+      cobrakits.login: true
+      cobrakits.respawn: true
   cobrakits.create:
     description: Allows player to create a kit
     default: op
@@ -90,4 +101,13 @@ permissions:
     default: op
   cobrakits.cooldown.bypass:
     description: Allows the player to not be affected by kit cooldowns
+    default: op
+  cobrakits.cost.bypass:
+    description: Players with this permission does not pay kit costs.
+    default: op
+  cobrakits.login:
+    description: This permissions allows the player to receive all login kits.
+    default: op
+  cobrakits.respawn:
+    description: This permission allws the player to receive all respawn kits.
     default: op
