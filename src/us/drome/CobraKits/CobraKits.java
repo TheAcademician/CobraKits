@@ -30,7 +30,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.SignChangeEvent;
 
 /*
- * CobraKits v.9 - Coded by TheAcademician - Released under GPLv3
+ * CobraKits v1.0 - Coded by TheAcademician - Released under GPLv3
  * TheAcademician@gmail.com
  */
 
@@ -140,7 +140,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		for(String owner : kitsDB.getKeys(false)) {
 			//Iterate through every kit name by getting a list of keys belonging to the owner's section of the config.
 			for(String name : kitsDB.getConfigurationSection(owner).getKeys(false)) {
-				//Add a new Kit to loadingList with the owner, name, and the Lists containing inventory and armor ItemStack[] values.
+				//Add a new Kit to loadingList with the owner, name, and the Lists containing inventory, armor, and potions, as well as cooldown and cost values.
 				loadingList.add(new Kit(owner, name,
 						kitsDB.getList(owner + "." + name + ".Inventory"),
 						kitsDB.getList(owner + "." + name + ".Armor"),
@@ -154,13 +154,14 @@ public class CobraKits extends JavaPlugin implements Listener {
 	}
 	
 	public void SaveKits() {
-		//Clean up all deleted entries from the yml file.
+		//Clean up all deleted entries from the yml file here.
 		for(Kit entry: kitsToRemove) {
 			if(kitsDB.contains(entry.Owner() + "." + entry.Name())) {
 				kitsDB.set(entry.Owner() + "." + entry.Name(), null);
 			}
 		}
 		kitsToRemove.clear();
+		
 		//Iterate through all Kits in the kitList.
 		for(Kit entry : kitList) {
 			//If the kitsDB does not have a section with a key owner.kitname.Armor(a basic check to see if the kit exists or not), create the .Armor and .Inventory sections.
@@ -174,6 +175,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//Set the .Armor and .Inventory keys. As they are stored as ItemStack[] in the Kit, call a custom method to return them as a List, which can be saved to the config file.
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Armor", entry.ArmorAsList());
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Inventory", entry.InventoryAsList());
+			//Set the potion effect list, cooldown, and cost values.
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Potions", entry.Potions());
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Cooldown", entry.Cooldown());
 			kitsDB.set(entry.Owner() + "." + entry.Name() + ".Cost", entry.Cost());
@@ -208,7 +210,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		}
 	}
 	
-	//When someone respawns after a death, attempt to apply any respawn kits to the player.
+	//When someone respawns after a death, attempt to apply any respawn kits to the player if they have permission.
 	@EventHandler
 	public void respawnDetector(PlayerRespawnEvent respawn) {
 		for(String kit : respawnkits) {
@@ -315,7 +317,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			sender.sendMessage(ChatColor.RED + "Run /ckit help " + ChatColor.AQUA + "[command]" + ChatColor.RED + " to view more information about it.");
 		} else {
 			switch (args.Arg2().toLowerCase()) {
-			case "lkit": //passthrough
+			case "lkit": //passthrough to kits
 			case "kits":
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/lkit or /kits");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.WHITE + "none");
@@ -667,7 +669,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		for(Kit entry: kitList) {
 			//If they sender is a player, we must check permissions and separate out that player's Personal kits.
 			if(sender instanceof Player) {
-				//If the player is op or has .useall, filter all Personal, Global, and Available kits.
+				//If the player is op or has .useall, filter all Personal, Server, Global, and Available kits.
 				if(sender.hasPermission("cobrakits.useall")) {
 					if(entry.Owner().equals("Global")) {
 						globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
@@ -698,7 +700,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
 								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 				}
-			//If the console ran the command, separate out only Global kits.
+			//If the console ran the command, separate out Server and Global kits.
 			} else {
 				if(entry.Owner().equals("Sever")) {
 					serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
@@ -767,7 +769,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 	 */
 	private void createKit(Player player, Args args){
 		//Force player data to be saved. The ensures inventory is up-to-date.
-		//Without this, recently moved ItemStacks can create duplicates in saved kits.
+		//Without this, recently moved ItemStacks can create duplicates in saved kits or items that vanish when used.
 		player.saveData();
 		
 		//Retrieve an instance of the player's inventory.
@@ -1006,19 +1008,25 @@ public class CobraKits extends JavaPlugin implements Listener {
 		
 		if(sender instanceof Player) {
 			if((cooldownEnabled || kit.Cooldown() > 0) && !(sender.hasPermission("cobrakits.cooldown.bypass" ) || sender.hasPermission("cobrakits.cooldown.bypass." + kit.Name()))) {
+				//Set the cooldown to the global cooldown value if it is enabled, if not, load the specific kit's cooldown.
 				int cooldown = cooldownEnabled ? (cooldownDuration > 0 ? cooldownDuration : 0) : (kit.Cooldown() > 0 ? kit.Cooldown() : 0);
+				
+				//Create an ArrayList of type Object, and add the kit and sender to it.
+				//This will be added to the cooldownList to identify if someone is on cooldown for a particular kit.
 				final ArrayList<Object> onCooldown = new ArrayList<Object>();
 				onCooldown.add(kit);
 				onCooldown.add(sender);
 				if(!cooldownList.contains(onCooldown)) {
+					//Add the onCooldown ArrayList to the cooldownList, and then start a SyncDelayedTask for the duration of the cooldown.
 					cooldownList.add(onCooldown);
 					getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
 					@Override
 					public void run() {
-						cooldownList.remove(onCooldown);
+						cooldownList.remove(onCooldown); //When the delayed task runs at the end of the cooldown, remove the onCooldown object from cooldownList.
 					}
 				}, Long.valueOf(cooldown));
 				} else {
+					//If the player is on cooldown, calculate the kit's cooldown from ticks to minutes and seconds to display to the player.
 					int minutes = cooldown/20/60;
 					int seconds = (minutes > 0) ? (cooldown / 20 % 60) : (cooldown / 20);
 					if (minutes > 0) {
@@ -1031,6 +1039,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 			
 			if(kit.Cost() != null && !(target.hasPermission("cobrakits.cost.bypass") || target.hasPermission("cobrakits.cost.bypass." + kit.Name()))) {
+				//If the player cannot bypass the cost, check to see if they have at least enough items to afford the kit and then remove them.
 				if(((Player)sender).getInventory().containsAtLeast(kit.Cost(), kit.Cost().getAmount())) {
 					((Player)sender).getInventory().remove(kit.Cost());
 				} else {
