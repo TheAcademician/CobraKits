@@ -10,13 +10,13 @@ class KitList extends ArrayList<Kit> {
 		//Iterate through all kits in this list.
 		for(Kit entry: this) {
 			//If owner.kitname matches, return true;
-			if((entry.Owner() + "." + entry.Name()).equals(Name)) {
+			if((entry.Owner() + "." + entry.Name()).equalsIgnoreCase(Name)) {
 				return true;
 			//If the owner of this kit is Global, check to see if the name matches the query.
-			} else if(entry.Owner().equals("Global") && entry.Name().equals(Name)) {
+			} else if(entry.Owner().equals("Global") && entry.Name().equalsIgnoreCase(Name)) {
 				return true;
 			//If the owner of this kit is Server, check to see if the name matches the query.
-			} else if(entry.Owner().equals("Server") && entry.Name().equals(Name)) {
+			} else if(entry.Owner().equals("Server") && entry.Name().equalsIgnoreCase(Name)) {
 				return true;
 			}
 		}
@@ -28,13 +28,13 @@ class KitList extends ArrayList<Kit> {
 		//Iterate through all kits in this list.
 		for(Kit entry: this) {
 			//If owner.kitname matches, return true;
-			if((entry.Owner() + "." + entry.Name()).equals(Name)) {
+			if((entry.Owner() + "." + entry.Name()).equalsIgnoreCase(Name)) {
 				return this.indexOf(entry);
 				//If the owner of this kit is Global, check to see if the name matches the query.
-			} else if(entry.Owner().equals("Global") && entry.Name().equals(Name)) {
+			} else if(entry.Owner().equals("Global") && entry.Name().equalsIgnoreCase(Name)) {
 				return this.indexOf(entry);
 				//If the owner of this kit is Server, check to see if the name matches the query.
-			} else if(entry.Owner().equals("Server") && entry.Name().equals(Name)) {
+			} else if(entry.Owner().equals("Server") && entry.Name().equalsIgnoreCase(Name)) {
 				return this.indexOf(entry);
 			}
 		}

@@ -1,8 +1,8 @@
 name: CobraKits
 main: us.drome.CobraKits.CobraKits
-version: 1.0
+version: 1.01
 author: TheAcademician
-description: Allows the creation and use of pre-staged item kits.
+description: A comprehensive kit plugin for Bukkit.
 website: http://www.bukkit.org/server-mods/CobraKits
 
 commands:
@@ -109,5 +109,5 @@ permissions:
     description: This permissions allows the player to receive all login kits.
     default: op
   cobrakits.respawn:
-    description: This permission allws the player to receive all respawn kits.
+    description: This permission allows the player to receive all respawn kits.
     default: op

@@ -42,7 +42,7 @@ class Args{
 				else if (entry.contentEquals("-cd") || entry.contentEquals("-cooldown")) { //If the flag is for cooldown, parse the next argument as the length.
 					if(arguments.size() > 1 && !isFlag(arguments.get(1))) {
 						try {
-							cooldown = Integer.parseInt(arguments.get(1)) * 20;
+							cooldown = Integer.parseInt(arguments.get(1));
 						} catch (NumberFormatException e) {
 							emptyArgs();
 							break;
@@ -58,16 +58,19 @@ class Args{
 								cost = new ItemStack(Material.AIR); //If "clear" is specified set the cost to a block of AIR. In the command method this will flag to blank the cost.
 							} else {
 								int costAmount = 0;
-								int costBlock = 0;
+								String costBlock = "";
 								try {
-									costBlock = Integer.parseInt(arguments.get(1).split(":")[0]);
+									costBlock = arguments.get(1).split(":")[0].toUpperCase();
 									costAmount = Integer.parseInt(arguments.get(1).split(":")[1]);
 								} catch (NumberFormatException e) {
 									emptyArgs();
 									break;
 								}
 								//Once we have the item and amount parsed, store a new ItemStack as the cost, being sure to set max durability for that type of item.
-								cost = new ItemStack(Material.getMaterial(costBlock), costAmount, Material.getMaterial(costBlock).getMaxDurability());
+								if(Material.getMaterial(costBlock) != null)
+									cost = new ItemStack(Material.getMaterial(costBlock), costAmount, Material.getMaterial(costBlock).getMaxDurability());
+								else
+									emptyArgs();
 							}
 						} else { emptyArgs(); break; }
 						//remove the cost flag and then the item information provided.

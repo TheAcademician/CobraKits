@@ -53,14 +53,13 @@ public class CobraKits extends JavaPlugin implements Listener {
 	private ArrayList<String> respawnkits = new ArrayList<String>();
 	//ArrayList to temporarily store player's names that are on cooldown.
 	private ArrayList<ArrayList<Object>> cooldownList = new ArrayList<ArrayList<Object>>();
+	private boolean updateEnabled = false;
+	private boolean updateAvailable = false;
+	private String updateVersion = "";
+	private String updateGameVersion = "";
 	
 	public void onEnable(){
 		getLogger().info("version " + getDescription().getVersion() + " is loading...");
-		File kitsBin = new File(getDataFolder() + File.separator + "kits.bin");
-		if(kitsBin.exists()){
-			getLogger().info("Detected kits.bin. You must convert kits.bin to kits.yml using CobraKits Beta .9 and CraftBukkit 1.5.2 before this version will load.");
-			getPluginLoader().disablePlugin(this);
-		}
 		try{
 			//Save the default configuration.
 			saveDefaultConfig();
@@ -73,6 +72,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			startkits = (ArrayList<String>) getConfig().getStringList("startkits");
 			loginkits = (ArrayList<String>) getConfig().getStringList("loginkits");
 			respawnkits = (ArrayList<String>) getConfig().getStringList("respawnkits");
+			updateEnabled = getConfig().getBoolean("update");
 			
 			kitsDByml = new File(getDataFolder() + File.separator + "kits.yml");
 			//If kits.yml does not exist, create it.
@@ -81,6 +81,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			kitsDB = YamlConfiguration.loadConfiguration(kitsDByml);
 			//load the kitList with the values from kitsDB.
 			kitList = LoadKits();
+			KitListChecker();
 
 			//Confirm that all specified startkits from config.yml are in the kitList.
 			if(startkits.size() > 0 ) {
@@ -117,6 +118,17 @@ public class CobraKits extends JavaPlugin implements Listener {
 			
 			//Set this class up to handle events from Bukkit.
 			getServer().getPluginManager().registerEvents(this, this);
+			
+			//Check for new version here and inform the console that it is available.
+			if(updateEnabled) {
+				Updater updater = new Updater(this,47788,this.getFile(),Updater.UpdateType.NO_DOWNLOAD, false);
+				if(updater.getResult() == Updater.UpdateResult.UPDATE_AVAILABLE) {
+					updateAvailable = true;
+					updateVersion = updater.getLatestName();
+					updateGameVersion = updater.getLatestGameVersion();
+					getLogger().info(updater.getLatestName() + " is now available for " + updater.getLatestGameVersion() + ". Run " + ChatColor.BOLD + "/ckits update" + ChatColor.RESET + " to download it!");
+				}
+			}
 		} catch (Exception e) {
 				e.printStackTrace();
 		}
@@ -140,6 +152,13 @@ public class CobraKits extends JavaPlugin implements Listener {
 		for(String owner : kitsDB.getKeys(false)) {
 			//Iterate through every kit name by getting a list of keys belonging to the owner's section of the config.
 			for(String name : kitsDB.getConfigurationSection(owner).getKeys(false)) {
+				
+				//Detect kits that have blank sections. These must be flushed from the kit list.
+				if(kitsDB.getList(owner + "." + name + ".Inventory").isEmpty()) {
+					kitsDB.set(owner + "." + name, null);
+					getLogger().info("has removed invalid kit " + owner + "." + name + "!");
+					continue;
+				}
 				//Add a new Kit to loadingList with the owner, name, and the Lists containing inventory, armor, and potions, as well as cooldown and cost values.
 				loadingList.add(new Kit(owner, name,
 						kitsDB.getList(owner + "." + name + ".Inventory"),
@@ -151,6 +170,34 @@ public class CobraKits extends JavaPlugin implements Listener {
 		}
 		getLogger().info("has successfully loaded " + loadingList.size() + " kits!");
 		return loadingList;
+	}
+	
+	public void KitListChecker() {
+		//check kit list for any amount:0 entities and restore them to 1
+		int itemsFixed = 0;
+		int kitsFixed = 0;
+		for(Kit kit : kitList) {
+			for(ItemStack item : kit.Inventory()) {
+				if(item != null && item.getAmount() == 0) {
+					item.setAmount(1);
+					itemsFixed++;
+				}
+			}
+			for(ItemStack item : kit.Armor()) {
+				if(item != null && item.getAmount() == 0) {
+					item.setAmount(1);
+					itemsFixed++;
+				}
+			}
+			if(itemsFixed > 0) {
+				getLogger().info("has fixed " + itemsFixed + " \"ghost\" items in kit: " + kit.Owner() + "." + kit.Name());
+				itemsFixed = 0;
+				kitsFixed++;
+			}
+		}
+		
+		if(kitsFixed > 0)
+			SaveKits();
 	}
 	
 	public void SaveKits() {
@@ -207,6 +254,12 @@ public class CobraKits extends JavaPlugin implements Listener {
 						applyKit(login.getPlayer(), kit, login.getPlayer(), true, true);
 					}
 			}
+		}
+		
+		//Notify anyone with cobrakits.* permissions if an update is available.
+		if(login.getPlayer().hasPermission("cobrakits.*") && updateAvailable) {
+			login.getPlayer().sendMessage(ChatColor.RED + updateVersion + ChatColor.LIGHT_PURPLE + " is now available for " + ChatColor.RED + updateGameVersion + ChatColor.LIGHT_PURPLE +
+					". Run " + ChatColor.RED + ChatColor.BOLD + "/ckits update" + ChatColor.RESET + ChatColor.LIGHT_PURPLE + " to download it!");
 		}
 	}
 	
@@ -314,7 +367,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			sender.sendMessage(ChatColor.RED + "/dkit " + ChatColor.AQUA + "[kitname]" + ChatColor.WHITE + ": Deletes this kit. " + ChatColor.RED + "This is permanent!!!");
 			sender.sendMessage(ChatColor.RED + "/kit " + ChatColor.AQUA + "[kitname] " + ChatColor.BLUE + "[username]" + ChatColor.WHITE + ": Use/Give the specified kit.");
 			sender.sendMessage(ChatColor.RED + "Kit List Colors: " + ChatColor.DARK_PURPLE + "Server" + ChatColor.RED + ", " + ChatColor.GREEN + "Global" + ChatColor.RED + ", " + ChatColor.GOLD + "Personal" + ChatColor.RED + ", " + ChatColor.AQUA + "Other's Kits");
-			sender.sendMessage(ChatColor.RED + "Run /ckit help " + ChatColor.AQUA + "[command]" + ChatColor.RED + " to view more information about it.");
+			sender.sendMessage(ChatColor.RED + "Run /ckits help " + ChatColor.AQUA + "[command]" + ChatColor.RED + " to view more information about it.");
 		} else {
 			switch (args.Arg2().toLowerCase()) {
 			case "lkit": //passthrough to kits
@@ -330,14 +383,16 @@ public class CobraKits extends JavaPlugin implements Listener {
 				sender.sendMessage(ChatColor.GREEN + "        -sk/-server: " + ChatColor.WHITE + "Create a Server Kit (requires .createall)");
 				sender.sendMessage(ChatColor.GREEN + "        -p/-potions: " + ChatColor.WHITE + "Capture active potion effects to the kit.");
 				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Add a cooldown to the kit.");
-				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [itemID]:[amount]: " + ChatColor.WHITE + "Specify a cost that must be paid to use the kit.");
+				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [Material]:[amount]: " + ChatColor.WHITE + "Specify a cost that must be paid to use the kit.");
+				sender.sendMessage(ChatColor.GREEN + "         Materials: http://jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.create, cobrakits.createall");
 				break;
 			case "ukit":
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Usage: " + ChatColor.WHITE + "/ukit " + ChatColor.AQUA + "[kitname]");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-p/-potions: " + ChatColor.WHITE + "Updates or clears potion effects.");
 				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Change kit cooldown. Supply 0 to clear.");
-				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [itemID]:[amount]: " + ChatColor.WHITE + "Change the kit cost, or \"clear\".");
+				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [Material]:[amount]: " + ChatColor.WHITE + "Change the kit cost, or \"clear\".");
+				sender.sendMessage(ChatColor.GREEN + "         Materials: http://jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.update, cobrakits.updateall");
 				break;
 			case "rkit":
@@ -374,6 +429,8 @@ public class CobraKits extends JavaPlugin implements Listener {
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "startkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove first-time logon kits.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "loginkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove logon kits.");
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "respawnkit" + ChatColor.AQUA + " +/-[kitname]" + ChatColor.WHITE + ": Add/Remove respawn kits.");
+		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "updater" + ChatColor.WHITE + ":  Toggle the updater.");
+		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "update" + ChatColor.WHITE + ": Update to the latest CobraKits.");
 	}
 
 	
@@ -557,6 +614,13 @@ public class CobraKits extends JavaPlugin implements Listener {
 								sender.sendMessage(ChatColor.LIGHT_PURPLE + "You have no active Respawn Kits. Set one with " + ChatColor.RED + "/ckits respawnkit +<kitname>");
 						}
 						break;
+					case "updater":
+						//If updater is specified, toggle the updateEnabled boolean and then set the config file. Finally, inform the user.
+						updateEnabled = !updateEnabled;
+						getConfig().set("update", updateEnabled);
+						saveConfig();
+						sender.sendMessage(ChatColor.LIGHT_PURPLE + "Updater Enabled: " + ChatColor.RED + ((updateEnabled) ? "True" : "False"));
+						break;
 					case "current":
 						//Reply with the current settings for all available configurable values.
 						sender.sendMessage(ChatColor.RED + "--" + ChatColor.LIGHT_PURPLE + "Current Settings" + ChatColor.RED + "--");
@@ -570,7 +634,19 @@ public class CobraKits extends JavaPlugin implements Listener {
 						sender.sendMessage(loginkits.toArray(new String[loginkits.size()]));
 						sender.sendMessage(ChatColor.AQUA + "Respawn Kits:");
 						sender.sendMessage(respawnkits.toArray(new String[respawnkits.size()]));
+						sender.sendMessage(ChatColor.AQUA + "Updater Enabled: " + ChatColor.RED + ((updateEnabled) ? "True" : "False"));
 						sender.sendMessage(ChatColor.RED + "------------------");
+						break;
+					case "update":
+						Updater updater = new Updater(this,47788,this.getFile(),Updater.UpdateType.DEFAULT, false);
+						if(updater.getResult() == Updater.UpdateResult.SUCCESS) {
+							sender.sendMessage(ChatColor.RED + "CobraKits " + ChatColor.LIGHT_PURPLE + "has been updated to " + ChatColor.RED + updater.getLatestName() + ChatColor.LIGHT_PURPLE + ".");
+							updateAvailable = false;
+							updateVersion = "";
+							updateGameVersion = "";
+						} else {
+							sender.sendMessage(ChatColor.RED + "CobraKits " + ChatColor.LIGHT_PURPLE + "has failed to update with reason: " + ChatColor.RED + updater.getResult().toString() + ChatColor.LIGHT_PURPLE + ".");
+						}
 						break;
 				}
 				saveConfig();
@@ -702,7 +778,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				}
 			//If the console ran the command, separate out Server and Global kits.
 			} else {
-				if(entry.Owner().equals("Sever")) {
+				if(entry.Owner().equals("Server")) {
 					serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
 							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
 				} else if(entry.Owner().equals("Global")) {
@@ -767,10 +843,12 @@ public class CobraKits extends JavaPlugin implements Listener {
 	/*
 	 * Create Function - Take the player's inventory and store it in the kitList as a new Kit.
 	 */
+	@SuppressWarnings("deprecation")
 	private void createKit(Player player, Args args){
 		//Force player data to be saved. The ensures inventory is up-to-date.
 		//Without this, recently moved ItemStacks can create duplicates in saved kits or items that vanish when used.
 		player.saveData();
+		player.updateInventory();
 		
 		//Retrieve an instance of the player's inventory.
 		PlayerInventory inventory = player.getInventory();
@@ -823,16 +901,18 @@ public class CobraKits extends JavaPlugin implements Listener {
 	/*
 	 * Update Function - Replace an existing kit with the contents of the player's inventory
 	 */
+	@SuppressWarnings("deprecation")
 	private void updateKit(CommandSender sender, Args args) {
 		if(sender instanceof Player){
 			String kitname = args.Arg1();
 			//Retrieve an instance of the player who send the command.
 			Player player = (Player)sender;
+			//Force player data to be saved. The ensures inventory is up-to-date.
+			//Without this, recently moved ItemStacks can create duplicates in saved kits or items that vanish when used.
+			player.saveData();
+			player.updateInventory();
 			//Retrieve an instance of the player's inventory.
 			PlayerInventory inventory = player.getInventory();
-			//Force player data to be saved. The ensures inventory is up-to-date.
-			//Without this, recently moved ItemStacks can create duplicates in saved kits.
-			player.saveData();
 			//Check the kitList to see if it contains playername.kitname.
 			if(kitList.contains(player.getName() + "." + kitname)) {
 				//If it does, cache the current Kit that is in the kitList (at index playername.kitname).
@@ -1003,6 +1083,9 @@ public class CobraKits extends JavaPlugin implements Listener {
 	
 	@SuppressWarnings("deprecation")
 	private void applyKit(Player target, String kitname, CommandSender sender, Boolean silent, Boolean concat) {
+		target.saveData();
+		target.updateInventory();
+		
 		//Retrieve the Kit from the kitList at the index of the specified kitname.
 		Kit kit = kitList.get(kitList.indexOf(kitname));
 		
@@ -1015,7 +1098,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				//This will be added to the cooldownList to identify if someone is on cooldown for a particular kit.
 				final ArrayList<Object> onCooldown = new ArrayList<Object>();
 				onCooldown.add(kit);
-				onCooldown.add(sender);
+				onCooldown.add(((Player) sender).getName());
 				if(!cooldownList.contains(onCooldown)) {
 					//Add the onCooldown ArrayList to the cooldownList, and then start a SyncDelayedTask for the duration of the cooldown.
 					cooldownList.add(onCooldown);
@@ -1024,11 +1107,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 					public void run() {
 						cooldownList.remove(onCooldown); //When the delayed task runs at the end of the cooldown, remove the onCooldown object from cooldownList.
 					}
-				}, Long.valueOf(cooldown));
+				}, Long.valueOf(cooldown * 20));
 				} else {
 					//If the player is on cooldown, calculate the kit's cooldown from ticks to minutes and seconds to display to the player.
-					int minutes = cooldown/20/60;
-					int seconds = (minutes > 0) ? (cooldown / 20 % 60) : (cooldown / 20);
+					int minutes = cooldown/60;
+					int seconds = (minutes > 0) ? (cooldown % 60) : (cooldown);
 					if (minutes > 0) {
 						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that kit every " + minutes + " minutes" + ((seconds > 0) ? (" and " + seconds + " seconds.") : "."));
 					} else {
@@ -1118,8 +1201,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 		if(target.hasPlayedBefore()) {
 			//Remove all potion effects from the player.
 			Collection<PotionEffect> effects = target.getActivePotionEffects();
-			for (PotionEffect effect : effects) {
-				target.removePotionEffect(effect.getType());
+			
+			if(!(concat || concatEnabled)) {
+				for (PotionEffect effect : effects) {
+					target.removePotionEffect(effect.getType());
+				}
 			}
 			
 			//Apply any kit potion effects
@@ -1128,6 +1214,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 			
 			//Force player to update inventory. Without this sometimes kits will apply but appear invisible.
+			target.saveData();
 			target.updateInventory();
 		}
 	}
@@ -1137,13 +1224,15 @@ public class CobraKits extends JavaPlugin implements Listener {
 		for(PotionEffect effect : PotionEffects) {
 			double maxDuration = 8 * 60 * 20 * effect.getType().getDurationModifier(); //The max potion duration is based off 8 minutes multiplied by the DurationModifier of the effect.
 			double baseDuration = maxDuration / (8.0 / 3.0); //The base duration for all potions, is the max possible duration multiplied by 8/3.
-			if(effect.getAmplifier() == 1) { 
+			if(effect.getDuration() > (8 * 60 * 20)) { //If the duration is beyond 8 minutes, it is a custom duration and will be preserved.
+				potionEffects.add(new PotionEffect(effect.getType(), effect.getDuration(), effect.getAmplifier()));
+			} else if(effect.getAmplifier() == 1) { 
 				//If the Amplifier is 1, this is a "II" potion which has the duration of the base, divided by 2.
 				potionEffects.add(new PotionEffect(effect.getType(), (int)(baseDuration / 2), 1));
 			} else {
 				//There is sadly no API way to tell if the potion effect was initiated by a potion of Max (8, usually)) or Base (3, usually) length,
 				//So, to determine what the potion duration should be, check to see if the current duration is above the base, if it is, it must be a Max duration potion.
-				potionEffects.add(new PotionEffect(effect.getType(), (int)(effect.getDuration() > baseDuration ? maxDuration : baseDuration), 0));
+				potionEffects.add(new PotionEffect(effect.getType(), (int)(effect.getDuration() > baseDuration ? maxDuration : baseDuration), effect.getAmplifier()));
 			}
 		}
 		return potionEffects;

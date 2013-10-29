@@ -1,4 +1,5 @@
 #Cobra Kits Options
+update: true
 cooldown:
   enabled: false
   duration: 600
