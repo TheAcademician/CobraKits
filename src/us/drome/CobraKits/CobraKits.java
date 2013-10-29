@@ -30,7 +30,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.SignChangeEvent;
 
 /*
- * CobraKits v1.0 - Coded by TheAcademician - Released under GPLv3
+ * CobraKits v1.1 - Coded by TheAcademician - Released under GPLv3
  * TheAcademician@gmail.com
  */
 
@@ -51,12 +51,15 @@ public class CobraKits extends JavaPlugin implements Listener {
 	private ArrayList<String> startkits = new ArrayList<String>();
 	private ArrayList<String> loginkits = new ArrayList<String>();
 	private ArrayList<String> respawnkits = new ArrayList<String>();
-	//ArrayList to temporarily store player's names that are on cooldown.
-	private ArrayList<ArrayList<Object>> cooldownList = new ArrayList<ArrayList<Object>>();
 	private boolean updateEnabled = false;
 	private boolean updateAvailable = false;
 	private String updateVersion = "";
 	private String updateGameVersion = "";
+	//Cooldown storage objects.
+	private File cooldownDByml;
+	private FileConfiguration cooldownDB;
+	private CooldownList cooldownList;
+	private CooldownList cdToRemove = new CooldownList();
 	
 	public void onEnable(){
 		getLogger().info("version " + getDescription().getVersion() + " is loading...");
@@ -82,6 +85,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//load the kitList with the values from kitsDB.
 			kitList = LoadKits();
 			KitListChecker();
+			
+			cooldownDByml = new File(getDataFolder() + File.separator + "cooldowns.yml");
+			if(!cooldownDByml.exists()) cooldownDByml.createNewFile();
+			cooldownDB = YamlConfiguration.loadConfiguration(cooldownDByml);
+			cooldownList = LoadCooldowns();
 
 			//Confirm that all specified startkits from config.yml are in the kitList.
 			if(startkits.size() > 0 ) {
@@ -140,6 +148,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			saveConfig();
 			//Save the kitList to kits.yml.
 			SaveKits();
+			SaveCooldowns();
 			getLogger().info("version " + getDescription().getVersion() + " has been unloaded.");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -147,6 +156,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 	}
 	
 	public KitList LoadKits() {
+		getLogger().info("has begun loading kits...");
 		KitList loadingList = new KitList();
 		//Iterate through every top-level key in kitsDB (the false indicates to not grab sub-keys) which is the kit's owner.
 		for(String owner : kitsDB.getKeys(false)) {
@@ -233,6 +243,54 @@ public class CobraKits extends JavaPlugin implements Listener {
 			getLogger().info("kits.yml has been successfully saved with " + kitList.size() + " kits.");
 		} catch (IOException e) {
 			 getLogger().log(Level.SEVERE, "Could not save config to " + kitsDB, e);
+		}
+	}
+	
+	public CooldownList LoadCooldowns() {
+		getLogger().info("has begun loading cached cooldowns...");
+		CooldownList loadingList = new CooldownList();
+		
+		//Iterate through all keys in cooldowns.yml
+		for(String player : cooldownDB.getKeys(false)) {
+			for(String kit : cooldownDB.getConfigurationSection(player).getKeys(false)) {
+				//Check for empty cooldowns and remove them.
+				if(kit.split(".").length < 2) {
+					cooldownDB.set(player + "." + kit, null);
+					continue;
+				}
+				//Add a new Cooldown entry to the list with the player name, kit name, and end time (in milliseconds).
+				cooldownList.add(new Cooldown(player, kit, cooldownDB.getLong(player + "." + kit + ".endTime")));
+			}
+		}
+		getLogger().info("has successfully loaded " + loadingList.size() + " cooldowns!");
+		return loadingList;
+	}
+	
+	public void SaveCooldowns() {
+		//Iterate through all Cooldowns to remove.
+		for(Cooldown entry : cdToRemove) {
+			//If they are found in the list, set them to null.
+			if(cooldownDB.contains(entry.player + "." + entry.kit)) {
+				cooldownDB.set(entry.player + "." + entry.kit.split(".")[0], null);
+			}
+		}
+		cdToRemove.clear(); //Clear the list.
+		
+		//Iterate through all Cooldowns.
+		for(Cooldown entry : cooldownList) {
+			//If the sections are missing, create them.
+			if(!cooldownDB.contains(entry.player + "." + entry.kit + ".endTime")) {
+				cooldownDB.createSection(entry.player + "." + entry.kit + ".endTime");
+			}
+			//Set the entry including player name, kit name, and end time (in milliseconds).
+			cooldownDB.set(entry.player + "." + entry.kit + ".endTime", entry.endTime);
+		}
+		
+		//Attempt to save cooldowns.yml
+		try {
+			cooldownDB.save(cooldownDByml);
+		} catch (IOException e) {
+			 getLogger().log(Level.SEVERE, "Could not save config to " + cooldownDB, e);
 		}
 	}
 	
@@ -384,7 +442,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				sender.sendMessage(ChatColor.GREEN + "        -p/-potions: " + ChatColor.WHITE + "Capture active potion effects to the kit.");
 				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Add a cooldown to the kit.");
 				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [Material]:[amount]: " + ChatColor.WHITE + "Specify a cost that must be paid to use the kit.");
-				sender.sendMessage(ChatColor.GREEN + "         Materials: http://jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
+				sender.sendMessage(ChatColor.GREEN + "Materials: " + ChatColor.RESET + "jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.create, cobrakits.createall");
 				break;
 			case "ukit":
@@ -392,7 +450,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Flags: " + ChatColor.GREEN + "-p/-potions: " + ChatColor.WHITE + "Updates or clears potion effects.");
 				sender.sendMessage(ChatColor.GREEN + "        -cd/-cooldown [seconds]: " + ChatColor.WHITE + "Change kit cooldown. Supply 0 to clear.");
 				sender.sendMessage(ChatColor.GREEN + "        -kc/-cost [Material]:[amount]: " + ChatColor.WHITE + "Change the kit cost, or \"clear\".");
-				sender.sendMessage(ChatColor.GREEN + "         Materials: http://jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
+				sender.sendMessage(ChatColor.GREEN + "Materials: " + ChatColor.RESET + "jd.bukkit.org/rb/apidocs/org/bukkit/Material.html");
 				sender.sendMessage(ChatColor.LIGHT_PURPLE + "Permissions: " + ChatColor.WHITE + "cobrakits.update, cobrakits.updateall");
 				break;
 			case "rkit":
@@ -625,7 +683,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 						//Reply with the current settings for all available configurable values.
 						sender.sendMessage(ChatColor.RED + "--" + ChatColor.LIGHT_PURPLE + "Current Settings" + ChatColor.RED + "--");
 						sender.sendMessage(ChatColor.AQUA + "Cooldowns Enabled: " + ChatColor.RED + ((cooldownEnabled) ? "True" : "False"));
-						sender.sendMessage(ChatColor.AQUA + "Current Duration: " + ChatColor.RED + String.valueOf(cooldownDuration / 20) + " seconds");
+						sender.sendMessage(ChatColor.AQUA + "Current Duration: " + ChatColor.RED + cooldownCalc(cooldownDuration));
 						sender.sendMessage(ChatColor.AQUA + "Concat Kits Enabled: " + ChatColor.RED + ((concatEnabled) ? "True" : "False"));
 						sender.sendMessage(ChatColor.AQUA + "Silent Kits Enabled: " + ChatColor.RED + ((silentEnabled) ? "True" : "False"));
 						sender.sendMessage(ChatColor.AQUA + "First-Time Login Kits:");
@@ -749,44 +807,44 @@ public class CobraKits extends JavaPlugin implements Listener {
 				if(sender.hasPermission("cobrakits.useall")) {
 					if(entry.Owner().equals("Global")) {
 						globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 					} else if(entry.Owner().equals(sender.getName())){
 						myKits.add(ChatColor.GOLD +  entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 					} else if(entry.Owner().equals("Server")) {
 						if(sender.hasPermission("cobrakits.*")) {
 							serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 						}
 					} else {
 						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 					}
 				//With .use, a player has access to all Global and their own Personal kits, sort them out here.
 				} else if(sender.hasPermission("cobrakits.use") && !sender.hasPermission("cobrakits.useall")) {
 					if(entry.Owner().equals("Global")) {
 						globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 					} else if(entry.Owner().equals(sender.getName())){
 						myKits.add(ChatColor.GOLD +  entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 					}
 				//If the player has a specific kit's permission (cobrakits.kitname) sort it out here.
 				} else if(sender.hasPermission("cobrakits." + entry.Owner() + "." + entry.Name()) && !sender.hasPermission("cobrakits.useall")) {
 						availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-								(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+								(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 				}
 			//If the console ran the command, separate out Server and Global kits.
 			} else {
 				if(entry.Owner().equals("Server")) {
 					serverKits.add(ChatColor.DARK_PURPLE + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+							(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 				} else if(entry.Owner().equals("Global")) {
 					globalKits.add(ChatColor.GREEN + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+							(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 				} else {
 					availableKits.add(ChatColor.AQUA + entry.Owner() + "." + entry.Name() + (entry.Cost() != null ? " - Cost: " + String.valueOf(entry.Cost().getAmount()) + " " + entry.Cost().getType().toString() : "") +
-							(entry.Cooldown() > 0 ? " - Cooldown: " + (entry.Cooldown() / 20) : ""));
+							(entry.Cooldown() > 0 ? " - Cooldown: " + cooldownCalc(entry.Cooldown()) : ""));
 				}
 			}
 		}
@@ -1092,41 +1150,50 @@ public class CobraKits extends JavaPlugin implements Listener {
 		if(sender instanceof Player) {
 			if((cooldownEnabled || kit.Cooldown() > 0) && !(sender.hasPermission("cobrakits.cooldown.bypass" ) || sender.hasPermission("cobrakits.cooldown.bypass." + kit.Name()))) {
 				//Set the cooldown to the global cooldown value if it is enabled, if not, load the specific kit's cooldown.
-				int cooldown = cooldownEnabled ? (cooldownDuration > 0 ? cooldownDuration : 0) : (kit.Cooldown() > 0 ? kit.Cooldown() : 0);
+				int duration = cooldownEnabled ? (cooldownDuration > 0 ? cooldownDuration : 0) : (kit.Cooldown() > 0 ? kit.Cooldown() : 0);
 				
-				//Create an ArrayList of type Object, and add the kit and sender to it.
-				//This will be added to the cooldownList to identify if someone is on cooldown for a particular kit.
-				final ArrayList<Object> onCooldown = new ArrayList<Object>();
-				onCooldown.add(kit);
-				onCooldown.add(((Player) sender).getName());
-				if(!cooldownList.contains(onCooldown)) {
-					//Add the onCooldown ArrayList to the cooldownList, and then start a SyncDelayedTask for the duration of the cooldown.
-					cooldownList.add(onCooldown);
-					getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
-					@Override
-					public void run() {
-						cooldownList.remove(onCooldown); //When the delayed task runs at the end of the cooldown, remove the onCooldown object from cooldownList.
-					}
-				}, Long.valueOf(cooldown * 20));
-				} else {
-					//If the player is on cooldown, calculate the kit's cooldown from ticks to minutes and seconds to display to the player.
-					int minutes = cooldown/60;
-					int seconds = (minutes > 0) ? (cooldown % 60) : (cooldown);
-					if (minutes > 0) {
-						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that kit every " + minutes + " minutes" + ((seconds > 0) ? (" and " + seconds + " seconds.") : "."));
+				//Get the current system time in milliseconds.
+				long currentTime = System.currentTimeMillis();
+				//Check to see if the player and kit name combination are already listed.
+				Cooldown cooldown = cooldownList.isOnCooldown(((Player)sender).getName(), kit.Owner() + "." + kit.Name());
+				//If the player is not on cooldown for this kit.
+				if(cooldown != null) {
+					//Check to see of the current time is greater than end time, indicating the cooldown is over.
+					if(currentTime > cooldown.endTime) {
+						//Remove the cooldown and save the cooldowns file.
+						cdToRemove.add(cooldown);
+						cooldownList.remove(cooldown);
+						SaveCooldowns();
 					} else {
-						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You can only use that kit every " + seconds + " seconds.");
+						//If the cooldown is still active, get the time remaining and display it to the player.
+						sender.sendMessage(ChatColor.LIGHT_PURPLE + "You cannot use that kit for another: " + cooldown.timeRemaining(currentTime));
+						return;
 					}
-					return;
-				}
+				} else {
+					//If the player is not on cooldown for this kit, add a cooldown with end time equal to current time + duration in milliseconds.
+					long endTime = System.currentTimeMillis() + (duration * 1000);
+					//Add this new cooldown to the list and save it.
+					cooldownList.add(new Cooldown(((Player)sender).getName(), kit.Owner() + "." + kit.Name(), endTime));
+					SaveCooldowns();
+				}	
 			}
 			
 			if(kit.Cost() != null && !(target.hasPermission("cobrakits.cost.bypass") || target.hasPermission("cobrakits.cost.bypass." + kit.Name()))) {
 				//If the player cannot bypass the cost, check to see if they have at least enough items to afford the kit and then remove them.
 				if(((Player)sender).getInventory().containsAtLeast(kit.Cost(), kit.Cost().getAmount())) {
+					//Remove the items from their inventory and update it.
 					((Player)sender).getInventory().remove(kit.Cost());
+					((Player)sender).updateInventory();
 				} else {
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + "You cannot afford to use this kit. It costs: " + String.valueOf(kit.Cost().getAmount()) + " " + kit.Cost().getType().toString());
+					//If the player cannot afford the kit, check to see if the cooldown was already added.
+					Cooldown cooldown = cooldownList.isOnCooldown(((Player)sender).getName(), kit.Owner() + "." + kit.Name());
+					//If a cooldown exists, remove it.
+					if(cooldown != null) {
+						cdToRemove.add(cooldown);
+						cooldownList.remove(cooldown);
+						SaveCooldowns();
+					}
 					return;
 				}
 			}
@@ -1236,5 +1303,13 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 		return potionEffects;
+	}
+	
+	//Helper method to calculate the cooldown duration for a kit in minutes/seconds. This is only used for /kits and /lkits.
+	private String cooldownCalc(int cooldown) {
+		int minutes = cooldown/60;
+		int seconds = (minutes > 0) ? (cooldown % 60) : (cooldown);
+		String time = (minutes > 0 ? minutes + "m" : "") + (minutes > 0 && seconds > 0 ? " " : "") + (seconds > 0 ? seconds + "s" : "");
+		return time;
 	}
 }

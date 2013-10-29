@@ -1,3 +1,31 @@
+===10/29/2013 Release 1.1
+*"Ghost" Item Issue
+	**Should no longer be saving "ghost" items to kits.	
+	**Any existing kits with ghost items should be fixed on plugin loading.
+	**Also resolved issue with null kits being saved.
+*Cost Flag Update
+	**Now requires a Material name be provided instead of itemID per future API changes.
+	**As the cost is stored as an ItemStack, no changes to existing kits are needed.
+	**Added link to list of Materials to help sections for /ckit & /ukit.
+*Potion Effect Changes
+	**Effect durations over 8 minutes long will now be preserved and not reduced to 8 minutes.
+		***This includes "infinite" effects over 1638 seconds long.
+		***Note that the effect duration is saved at kit creation/update, and must be over those limits when saved to be effective.
+	**Custom effect amplifiers will also now be preserved.
+	**Potions will now concatenate with other potion effects if the -c/concat flag is specified with /kit.
+*Cooldown Revamp
+	**Cooldowns are now stored/processed in seconds instead of ticks.
+		***Only config.yml should need to be updated if you use the global cooldown.
+	**Now persistent and will continue through logout & restart.
+	**They are stored in cooldowns.yml.
+	**When running /kit while on cooldown, it will display the remaining cooldown time to the player, not the total cooldown time.
+*Kit name are now case-insensitive.
+*Updater!
+	**CobraKits now has a built in updater that is enabled by default.
+	**Can be toggled off/on by running /ckits updater or by changing the config.yml value.
+	**Update is not automatic, but it will check on plugin load for new versions.
+	**Users with cobrakits.* permission will receive a message if an update is available.
+	**To initiate an update run /ckits update.
 ===6/13/2013 Release 1.0
 *NEW - Respawn Kits
 	**Now you can supply kits to players on respawn!
