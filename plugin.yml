@@ -3,7 +3,7 @@ main: us.drome.CobraKits.CobraKits
 version: 1.1
 author: TheAcademician
 description: A comprehensive kit plugin for Bukkit.
-website: http://www.bukkit.org/server-mods/CobraKits
+website: http://dev.bukkit.org/bukkit-plugins/cobrakits/
 
 commands:
   ckits:
