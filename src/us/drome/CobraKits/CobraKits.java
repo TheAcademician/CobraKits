@@ -1182,8 +1182,25 @@ public class CobraKits extends JavaPlugin implements Listener {
 				//If the player cannot bypass the cost, check to see if they have at least enough items to afford the kit and then remove them.
 				if(((Player)sender).getInventory().containsAtLeast(kit.Cost(), kit.Cost().getAmount())) {
 					//Remove the items from their inventory and update it.
-					((Player)sender).getInventory().remove(kit.Cost());
-					((Player)sender).updateInventory();
+					int slot;
+					ItemStack stack;
+					int stackAmount;
+					int itemsLeft = kit.Cost().getAmount();
+					while(itemsLeft > 0) {
+						slot = ((Player)sender).getInventory().first(kit.Cost().getType());
+						stack = ((Player)sender).getInventory().getItem(slot);
+						stackAmount = stack.getAmount();
+						if(stackAmount <= itemsLeft) {
+							((Player)sender).getInventory().clear(slot);
+							((Player)sender).updateInventory();
+							itemsLeft -= stackAmount;
+						} else {
+							stackAmount -= itemsLeft;
+							((Player)sender).getInventory().setItem(slot, new ItemStack(kit.Cost().getType(), stackAmount));
+							((Player)sender).updateInventory();
+							itemsLeft = 0;
+						}
+					}
 				} else {
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + "You cannot afford to use this kit. It costs: " + String.valueOf(kit.Cost().getAmount()) + " " + kit.Cost().getType().toString());
 					//If the player cannot afford the kit, check to see if the cooldown was already added.
