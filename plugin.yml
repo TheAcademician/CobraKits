@@ -1,9 +1,9 @@
 name: CobraKits
 main: us.drome.CobraKits.CobraKits
-version: 1.1
+version: ${project.version}
 author: TheAcademician
-description: A comprehensive kit plugin for Bukkit.
-website: http://dev.bukkit.org/bukkit-plugins/cobrakits/
+description: ${project.description}
+website: ${project.url}
 
 commands:
   ckits:
@@ -36,7 +36,7 @@ commands:
   kit:
     description: Use the kit or Give it to someone else.
     usage: /kit [kitname] [targetplayer]
-    
+
 permissions:
   cobrakits.*:
     description: Give access to all CobraKits commands
