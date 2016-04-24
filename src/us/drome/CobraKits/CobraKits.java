@@ -60,7 +60,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 	private FileConfiguration cooldownDB;
 	private CooldownList cooldownList;
 	private CooldownList cdToRemove = new CooldownList();
-	
+
 	public void onEnable(){
 		getLogger().info("version " + getDescription().getVersion() + " is loading...");
 		try{
@@ -76,7 +76,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			loginkits = (ArrayList<String>) getConfig().getStringList("loginkits");
 			respawnkits = (ArrayList<String>) getConfig().getStringList("respawnkits");
 			updateEnabled = getConfig().getBoolean("update");
-			
+
 			kitsDByml = new File(getDataFolder() + File.separator + "kits.yml");
 			//If kits.yml does not exist, create it.
 			if(!kitsDByml.exists()) kitsDByml.createNewFile();
@@ -85,7 +85,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//load the kitList with the values from kitsDB.
 			kitList = LoadKits();
 			KitListChecker();
-			
+
 			cooldownDByml = new File(getDataFolder() + File.separator + "cooldowns.yml");
 			if(!cooldownDByml.exists()) cooldownDByml.createNewFile();
 			cooldownDB = YamlConfiguration.loadConfiguration(cooldownDByml);
@@ -98,10 +98,10 @@ public class CobraKits extends JavaPlugin implements Listener {
 						//If the kit is not in kitList, clear the config.yml entry.
 						getConfig().set(entry, null);
 						getLogger().info("Configured Start Kit " + entry + " is not valid, clearing it.");
-					}	
+					}
 				}
 			}
-			
+
 			//Confirm that all specified loginkits from config.yml are in the kitList.
 			if(loginkits.size() > 0) {
 				for(String entry: loginkits) {
@@ -112,7 +112,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 					}
 				}
 			}
-			
+
 			//Confirm that all specified respawnkits from config.yml are in the kitList.
 			if(respawnkits.size() > 0) {
 				for(String entry: respawnkits) {
@@ -123,10 +123,10 @@ public class CobraKits extends JavaPlugin implements Listener {
 					}
 				}
 			}
-			
+
 			//Set this class up to handle events from Bukkit.
 			getServer().getPluginManager().registerEvents(this, this);
-			
+
 			//Check for new version here and inform the console that it is available.
 			if(updateEnabled) {
 				Updater updater = new Updater(this,47788,this.getFile(),Updater.UpdateType.NO_DOWNLOAD, false);
@@ -141,7 +141,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				e.printStackTrace();
 		}
 	}
-	
+
 	public void onDisable(){
 		try{
 			//Save the config file.
@@ -154,7 +154,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public KitList LoadKits() {
 		getLogger().info("has begun loading kits...");
 		KitList loadingList = new KitList();
@@ -162,7 +162,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		for(String owner : kitsDB.getKeys(false)) {
 			//Iterate through every kit name by getting a list of keys belonging to the owner's section of the config.
 			for(String name : kitsDB.getConfigurationSection(owner).getKeys(false)) {
-				
+
 				//Detect kits that have blank sections. These must be flushed from the kit list.
 				if(kitsDB.getList(owner + "." + name + ".Inventory").isEmpty()) {
 					kitsDB.set(owner + "." + name, null);
@@ -181,7 +181,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		getLogger().info("has successfully loaded " + loadingList.size() + " kits!");
 		return loadingList;
 	}
-	
+
 	public void KitListChecker() {
 		//check kit list for any amount:0 entities and restore them to 1
 		int itemsFixed = 0;
@@ -205,11 +205,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 				kitsFixed++;
 			}
 		}
-		
+
 		if(kitsFixed > 0)
 			SaveKits();
 	}
-	
+
 	public void SaveKits() {
 		//Clean up all deleted entries from the yml file here.
 		for(Kit entry: kitsToRemove) {
@@ -218,7 +218,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 		kitsToRemove.clear();
-		
+
 		//Iterate through all Kits in the kitList.
 		for(Kit entry : kitList) {
 			//If the kitsDB does not have a section with a key owner.kitname.Armor(a basic check to see if the kit exists or not), create the .Armor and .Inventory sections.
@@ -245,11 +245,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 			 getLogger().log(Level.SEVERE, "Could not save config to " + kitsDB, e);
 		}
 	}
-	
+
 	public CooldownList LoadCooldowns() {
 		getLogger().info("has begun loading cached cooldowns...");
 		CooldownList loadingList = new CooldownList();
-		
+
 		//Iterate through all keys in cooldowns.yml
 		for(String player : cooldownDB.getKeys(false)) {
 			for(String kit : cooldownDB.getConfigurationSection(player).getKeys(false)) {
@@ -265,7 +265,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		getLogger().info("has successfully loaded " + loadingList.size() + " cooldowns!");
 		return loadingList;
 	}
-	
+
 	public void SaveCooldowns() {
 		//Iterate through all Cooldowns to remove.
 		for(Cooldown entry : cdToRemove) {
@@ -275,7 +275,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 		cdToRemove.clear(); //Clear the list.
-		
+
 		//Iterate through all Cooldowns.
 		for(Cooldown entry : cooldownList) {
 			//If the sections are missing, create them.
@@ -285,7 +285,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			//Set the entry including player name, kit name, and end time (in milliseconds).
 			cooldownDB.set(entry.player + "." + entry.kit + ".endTime", entry.endTime);
 		}
-		
+
 		//Attempt to save cooldowns.yml
 		try {
 			cooldownDB.save(cooldownDByml);
@@ -293,16 +293,19 @@ public class CobraKits extends JavaPlugin implements Listener {
 			 getLogger().log(Level.SEVERE, "Could not save config to " + cooldownDB, e);
 		}
 	}
-	
+
 	//Whenever someone logs onto the server, attempt to apply any startkits or loginkits to the player, if applicable.
 	@EventHandler
 	public void loginDetector(PlayerJoinEvent login) {
 		//If the player has not played before on this server.
 		if(!login.getPlayer().hasPlayedBefore()) {
 			//Iterate through the startkits List and apply any kits. Startkits are applied silently (true) and concatenate with the current inventory (true).
+		    boolean concat = false;
 			for(String kit : startkits) {
-				if(kitList.contains(kit))
-					applyKit(login.getPlayer(), kit, login.getPlayer(), true, true);
+				if(kitList.contains(kit)) {
+					applyKit(login.getPlayer(), kit, login.getPlayer(), true, concat);
+					concat = true;
+				}
 			}
 		} else {
 			//Iterate through the loginkits List and apply any kits. Loginkits are applied silently (true) and concatenate with the current inventory (true).
@@ -313,25 +316,28 @@ public class CobraKits extends JavaPlugin implements Listener {
 					}
 			}
 		}
-		
+
 		//Notify anyone with cobrakits.* permissions if an update is available.
 		if(login.getPlayer().hasPermission("cobrakits.*") && updateAvailable) {
 			login.getPlayer().sendMessage(ChatColor.RED + updateVersion + ChatColor.LIGHT_PURPLE + " is now available for " + ChatColor.RED + updateGameVersion + ChatColor.LIGHT_PURPLE +
 					". Run " + ChatColor.RED + ChatColor.BOLD + "/ckits update" + ChatColor.RESET + ChatColor.LIGHT_PURPLE + " to download it!");
 		}
 	}
-	
+
 	//When someone respawns after a death, attempt to apply any respawn kits to the player if they have permission.
 	@EventHandler
 	public void respawnDetector(PlayerRespawnEvent respawn) {
 		for(String kit : respawnkits) {
-			if(kitList.contains(kit))
+			if(kitList.contains(kit)) {
+			    boolean concat = false;
 				if(respawn.getPlayer().hasPermission("cobrakits.respawn") || respawn.getPlayer().hasPermission("cobrakits.respawn." + kit)) {
-					applyKit(respawn.getPlayer(), kit, respawn.getPlayer(), true, true);
+					applyKit(respawn.getPlayer(), kit, respawn.getPlayer(), true, concat);
+					concat = true;
 				}
+			}
 		}
 	}
-	
+
 	//Whenever someone creates a sign, determine if it is a Kit Sign and correctly configure the signs values.
 	@EventHandler
 	public void kitSignCreateDetector(SignChangeEvent sign) {
@@ -377,7 +383,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 	}
-	
+
 	//Whenever a Player interacts with a block, determine if it is a Kit Sign, and apply the kit.
 	@EventHandler
 	public void kitSignUseDetector(PlayerInteractEvent e) {
@@ -413,7 +419,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		}
 	}
 
-	
+
 	//Method that displays the /ckits help command output which details usage info for the various commands.
 	private void helpInfo(CommandSender sender, Args args) {
 		if(args.Arg2().isEmpty()) {
@@ -474,7 +480,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 	}
-	
+
 	//Method that displays the usage info when a player runs the /ckits command with no options.
 	private void usageInfo(CommandSender sender){
 		sender.sendMessage("- " + ChatColor.RED + "CobraKits" + ChatColor.WHITE + " - v" + getDescription().getVersion() + " - Developed by " + ChatColor.LIGHT_PURPLE + "TheAcademician" + ChatColor.WHITE + ".");
@@ -491,7 +497,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		sender.sendMessage(ChatColor.RED + "/ckits " + ChatColor.LIGHT_PURPLE + "update" + ChatColor.WHITE + ": Update to the latest CobraKits.");
 	}
 
-	
+
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args){
 		if(cmd.getName().equalsIgnoreCase("ckits")) { //Usage info or make config changes
 			if(args.length == 0){
@@ -554,7 +560,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("startkits", startkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the First-Time Login Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 								//If the second argument begins with a "-" they want to remove a kit from the startkits List.
 								} else if(args[1].startsWith("-")) {
@@ -567,7 +573,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("startkits", startkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been removed from the First-Time Login Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", is not a First-Time Login Kit. Use " + ChatColor.RED + "/ckits startkits" + ChatColor.LIGHT_PURPLE + "to see the current kits.");
 								}
 							}
@@ -600,7 +606,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("loginkits", loginkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the Login Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 								//If the second argument begins with a "-" they want to remove a kit to the loginkits List.
 								} else if(args[1].contains("-")) {
@@ -613,7 +619,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("loginkits", loginkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been removed from the Login Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", is not a Login Kit. Use " + ChatColor.RED + "/ckits loginkits " + ChatColor.LIGHT_PURPLE + "to see the current kits.");
 								}
 							}
@@ -646,7 +652,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("respawnkits", respawnkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been added to the Respawn Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 								//If the second argument begins with a "-" they want to remove a kit to the loginkits List.
 								} else if(args[1].contains("-")) {
@@ -659,7 +665,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 										getConfig().set("respawnkits", respawnkits);
 										saveConfig();
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "Kit " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + " has been removed from the Respawn Kits list.");
-									} else 
+									} else
 										sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", is not a Respawn Kit. Use " + ChatColor.RED + "/ckits respawnkits " + ChatColor.LIGHT_PURPLE + "to see the current kits.");
 								}
 							}
@@ -787,7 +793,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		}
 		return false;
 	}
-	
+
 	/*
 	 * List Function - Display a list of kits that the player/console has access to use
 	 */
@@ -857,13 +863,13 @@ public class CobraKits extends JavaPlugin implements Listener {
 		availableKits.addAll(0, globalKits);
 		availableKits.addAll(0, serverKits);
 		availableKits.addAll(0, myKits);
-		
+
 		//If the player has no permission to use any kits, send a permissions error.
 		if(availableKits.size() == 0) {
 			sender.sendMessage(ChatColor.DARK_RED + "You do not have permission to do that.");
 			return;
 		}
-		
+
 		//Since the chat window can only display 10 lines, reduce the length of the kit list to 8, depending on if a page is specified.
 		int page = 0;
 		//Attempt to parse out an page number from the arguments. try/catch prevents error if non-numerial characters are entered.
@@ -893,11 +899,11 @@ public class CobraKits extends JavaPlugin implements Listener {
 		//Add footer.
 		int maxPage = (int) Math.ceil(availableKits.size() / 8d);
 		listReply.add(ChatColor.RED + "-Page " + String.format("%2d", page) + " of " + String.format("%-2d", maxPage) + " -");
-		
+
 		//Send the compiled reply to the player
 		sender.sendMessage(listReply.toArray(new String[listReply.size()]));
 	}
-	
+
 	/*
 	 * Create Function - Take the player's inventory and store it in the kitList as a new Kit.
 	 */
@@ -907,10 +913,10 @@ public class CobraKits extends JavaPlugin implements Listener {
 		//Without this, recently moved ItemStacks can create duplicates in saved kits or items that vanish when used.
 		player.saveData();
 		player.updateInventory();
-		
+
 		//Retrieve an instance of the player's inventory.
 		PlayerInventory inventory = player.getInventory();
-		
+
 		//If the -sk/-server flag was specified and the player has permission, create a Server kit.
 		if(args.Server() && player.hasPermission("cobrakits.*")) {
 			//If the kitList doesn't already have a Server kit with that name, proceed.
@@ -955,7 +961,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 	}
-	
+
 	/*
 	 * Update Function - Replace an existing kit with the contents of the player's inventory
 	 */
@@ -1007,14 +1013,14 @@ public class CobraKits extends JavaPlugin implements Listener {
 			sender.sendMessage(ChatColor.DARK_RED + "Only a Player can update a kit!");
 		}
 	}
-	
+
 	/*
 	 * Rename Function - Allows player/console to rename an existing kit from the kitList.
 	 */
 	private void renameKit(CommandSender sender, Args args) {
 		String kitname = args.Arg1();
 		String newname = args.Arg2();
-		
+
 		//Check the kitList to see if it contains playername.kitname. (sender can be either a player or console. If it is console, it will not be found and skip to the Else)
 		if(kitList.contains(sender.getName() + "." + kitname)) {
 			if(newname.contains(".")) {
@@ -1054,7 +1060,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 		}
 	}
-	
+
 	/*
 	 * Delete Function - Allows players/console to remove an existing kit from the kitList.
 	 */
@@ -1077,7 +1083,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 		}
 	}
-	
+
 	/*
 	 * Give Function - Allows console to give player's kits, also allows player's to give themselves or other players kits
 	 */
@@ -1091,7 +1097,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		if(!options.Arg2().isEmpty()) {
 			//If Args2 is not empty, it is the target player. Check to make sure they are online.
 			target = getServer().getPlayer(options.Arg2());
-			if (target == null) { 
+			if (target == null) {
 				sender.sendMessage(options.Arg2() + " is not online!");
 				return;
 			//If the target is online and the sender has give permissions, give the target player the kit.
@@ -1100,7 +1106,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist, or you do not have permission to use it. Use "  + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
 					return;
 				} else if(kitList.contains(kitname)) {
-					applyKit(target, kitname, sender, silent, concat);	
+					applyKit(target, kitname, sender, silent, concat);
 					return;
 				} else {
 					sender.sendMessage(ChatColor.LIGHT_PURPLE + "The specified kit, " + ChatColor.AQUA + kitname + ChatColor.LIGHT_PURPLE + ", does not exist. Use " + ChatColor.RED + "/lkit or /kits " + ChatColor.LIGHT_PURPLE + "to see available kits.");
@@ -1111,7 +1117,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				return;
 			}
 		}
-		
+
 		//If no target has been set, check to see if this is a player and then parse and apply kit according to permissions.
 		if(target == null) {
 			if(sender instanceof Player) {
@@ -1138,20 +1144,20 @@ public class CobraKits extends JavaPlugin implements Listener {
 			}
 		}
 	}
-	
+
 	@SuppressWarnings("deprecation")
 	private void applyKit(Player target, String kitname, CommandSender sender, Boolean silent, Boolean concat) {
 		target.saveData();
 		target.updateInventory();
-		
+
 		//Retrieve the Kit from the kitList at the index of the specified kitname.
 		Kit kit = kitList.get(kitList.indexOf(kitname));
-		
+
 		if(sender instanceof Player) {
 			if((cooldownEnabled || kit.Cooldown() > 0) && !(sender.hasPermission("cobrakits.cooldown.bypass" ) || sender.hasPermission("cobrakits.cooldown.bypass." + kit.Name()))) {
 				//Set the cooldown to the global cooldown value if it is enabled, if not, load the specific kit's cooldown.
 				int duration = cooldownEnabled ? (cooldownDuration > 0 ? cooldownDuration : 0) : (kit.Cooldown() > 0 ? kit.Cooldown() : 0);
-				
+
 				//Get the current system time in milliseconds.
 				long currentTime = System.currentTimeMillis();
 				//Check to see if the player and kit name combination are already listed.
@@ -1175,9 +1181,9 @@ public class CobraKits extends JavaPlugin implements Listener {
 					//Add this new cooldown to the list and save it.
 					cooldownList.add(new Cooldown(((Player)sender).getName(), kit.Owner() + "." + kit.Name(), endTime));
 					SaveCooldowns();
-				}	
+				}
 			}
-			
+
 			if(kit.Cost() != null && !(target.hasPermission("cobrakits.cost.bypass") || target.hasPermission("cobrakits.cost.bypass." + kit.Name()))) {
 				//If the player cannot bypass the cost, check to see if they have at least enough items to afford the kit and then remove them.
 				if(((Player)sender).getInventory().containsAtLeast(kit.Cost(), kit.Cost().getAmount())) {
@@ -1198,7 +1204,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 				}
 			}
 		}
-		
+
 		if(concat || concatEnabled){
 			//With the concat flag, a player's existing inventory will be preserved, items in the kit will be added to it.
 			ItemStack[] inventory = kit.Inventory();
@@ -1228,7 +1234,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 							failed.clear();
 						}
 					} else if(entry.getType().toString().contains("HELMET")) {
-						if (target.getInventory().getHelmet() == null) { 
+						if (target.getInventory().getHelmet() == null) {
 							target.getInventory().setHelmet(entry);
 						} else {
 							failed = target.getInventory().addItem(entry);
@@ -1236,7 +1242,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 							failed.clear();
 						}
 					} if(entry.getType().toString().contains("LEGGINGS")) {
-						if (target.getInventory().getLeggings() ==null) { 
+						if (target.getInventory().getLeggings() ==null) {
 							target.getInventory().setLeggings(entry);
 						} else {
 							failed = target.getInventory().addItem(entry);
@@ -1268,24 +1274,24 @@ public class CobraKits extends JavaPlugin implements Listener {
 		if(target.hasPlayedBefore()) {
 			//Remove all potion effects from the player.
 			Collection<PotionEffect> effects = target.getActivePotionEffects();
-			
+
 			if(!(concat || concatEnabled)) {
 				for (PotionEffect effect : effects) {
 					target.removePotionEffect(effect.getType());
 				}
 			}
-			
+
 			//Apply any kit potion effects
 			if(kit.Potions() != null) {
 				target.addPotionEffects(kit.Potions());
 			}
-			
+
 			//Force player to update inventory. Without this sometimes kits will apply but appear invisible.
 			target.saveData();
 			target.updateInventory();
 		}
 	}
-	
+
 	private List<PotionEffect> maxDurationEffects(Collection<PotionEffect> PotionEffects){
 		List<PotionEffect> potionEffects = new ArrayList<PotionEffect>();
 		for(PotionEffect effect : PotionEffects) {
@@ -1293,7 +1299,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 			double baseDuration = maxDuration / (8.0 / 3.0); //The base duration for all potions, is the max possible duration multiplied by 8/3.
 			if(effect.getDuration() > (8 * 60 * 20)) { //If the duration is beyond 8 minutes, it is a custom duration and will be preserved.
 				potionEffects.add(new PotionEffect(effect.getType(), effect.getDuration(), effect.getAmplifier()));
-			} else if(effect.getAmplifier() == 1) { 
+			} else if(effect.getAmplifier() == 1) {
 				//If the Amplifier is 1, this is a "II" potion which has the duration of the base, divided by 2.
 				potionEffects.add(new PotionEffect(effect.getType(), (int)(baseDuration / 2), 1));
 			} else {
@@ -1304,7 +1310,7 @@ public class CobraKits extends JavaPlugin implements Listener {
 		}
 		return potionEffects;
 	}
-	
+
 	//Helper method to calculate the cooldown duration for a kit in minutes/seconds. This is only used for /kits and /lkits.
 	private String cooldownCalc(int cooldown) {
 		int minutes = cooldown/60;

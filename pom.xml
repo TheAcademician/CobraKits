@@ -2,12 +2,24 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>us.drome</groupId>
   <artifactId>CobraKits</artifactId>
-  <version>1.1</version>
+  <version>1.2</version>
   <name>CobraKits</name>
   <packaging>jar</packaging>
   <description>A kit plugin for the CraftBukkit Minecraft Server</description>
     <build>
+      <defaultGoal>clean package</defaultGoal>
         <sourceDirectory>src</sourceDirectory>
+		<resources>
+          <resource>
+            <targetPath>.</targetPath>
+            <filtering>true</filtering>
+            <directory>${basedir}</directory>
+            <includes>
+              <include>plugin.yml</include>
+              <include>config.yml</include>
+            </includes>
+          </resource>
+		</resources>
         <plugins>
          <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
